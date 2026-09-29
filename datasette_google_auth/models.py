@@ -43,3 +43,27 @@ class CredentialInfo(BaseModel):
             status_detail=row.status_detail,
             is_owner=actor_id is not None and str(actor_id) == row.owner_id,
         )
+
+
+class DeleteResult(BaseModel):
+    """What ``service.delete()`` did, for the UI to report. No secrets.
+
+    OAuth: ``revoked`` says whether Google confirmed revoking the refresh
+    token; if not, ``revoke_error`` says why and the user should remove
+    access at myaccount.google.com/permissions. The row is deleted either
+    way.
+
+    Service account: the key still exists at Google, so the UI should say
+    "Also delete key ``private_key_id`` in the Cloud console", linking to
+    ``cloud_console_url``. Those fields are ``None`` if the stored key
+    couldn't be decrypted.
+    """
+
+    id: str
+    type: str
+    revoked: bool | None = None
+    revoke_error: str | None = None
+    client_email: str | None = None
+    private_key_id: str | None = None
+    project_id: str | None = None
+    cloud_console_url: str | None = None

@@ -24,6 +24,7 @@ from .errors import (
     MissingScopes,
     error_response,
 )
+from .events import EVENTS
 from .internal_migrations import internal_migrations
 from .models import CredentialInfo
 from .oauth import connect_url
@@ -64,6 +65,11 @@ def register_routes():
 @hookimpl
 def register_actions(datasette):
     return actions()
+
+
+@hookimpl
+def register_events(datasette):
+    return EVENTS
 
 
 @hookimpl

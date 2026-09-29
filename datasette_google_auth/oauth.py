@@ -51,6 +51,12 @@ from .errors import (
     EncryptionNotConfigured,
     GoogleTokenError,
 )
+from .events import (
+    CredentialCreatedEvent,
+    CredentialReconnectedEvent,
+    mark_broken,
+    track_credential_event,
+)
 from .http import client, google_error
 from .internal_db import CredentialRow, InternalDB
 from .permissions import can_connect
@@ -422,7 +428,12 @@ async def finish_connect(datasette: Datasette, request: Request) -> Response:
     cache = get_token_cache(datasette)
     cache.evict(row.id)
     await _seed(cache, oauth_cache_key(row), granted.token)
-    # Ticket 11: fire credential-created if `created`, else credential-reconnected.
+    await track_credential_event(
+        datasette,
+        CredentialCreatedEvent if created else CredentialReconnectedEvent,
+        row,
+        request.actor,
+    )
 
     datasette.add_message(request, f"Connected Google account {row.label}")
     # openid/email are left out: userinfo just proved them, and Google may
@@ -595,6 +606,28 @@ async def refresh_access_token(
     return _parse_token_reply(response, scopes)
 
 
+async def revoke_token(datasette: Datasette, token: str) -> str | None:
+    """Revoke a refresh token at Google (``google_base_urls.oauth_revoke``),
+    which ends the whole grant. Best effort, for delete (D16).
+
+    Returns ``None`` if Google confirmed it (HTTP 200), else why not, safe
+    to show: Google's ``error`` / ``error_description`` or the network
+    error's class name, never the token.
+    """
+    url = get_config(datasette).google_base_urls.oauth_revoke
+    try:
+        async with client(datasette) as http:
+            response = await http.post(url, data={"token": token})
+    except httpx2.HTTPError as ex:
+        # The exception text may include the request (and so the token).
+        return f"no response from Google ({type(ex).__name__})"
+    if response.status_code == 200:
+        return None
+    error, description = google_error(response)
+    reason = ": ".join(part for part in (error, description) if part)
+    return f"HTTP {response.status_code}" + (f": {reason}" if reason else "")
+
+
 # --- For the broker (ticket 10) ----------------------------------------------
 
 
@@ -673,11 +706,10 @@ async def _fetch_once(
                 http, get_config(datasette), refresh_token, scopes=row.scopes
             )
     except CredentialBroken:
-        if not await idb.mark_broken(row.id, BROKEN_DETAIL, expected_secret=blob):
+        # Evicts the cache and fires the broken event only if the write lands.
+        if not await mark_broken(datasette, row, BROKEN_DETAIL, actor_id=actor_id):
             # Reconnected meanwhile: the rejected secret is no longer stored.
             return None
-        cache.evict(row.id)
-        # Ticket 11: fire the credential-broken event here.
         raise CredentialBroken(
             BROKEN_DETAIL,
             credential_id=row.id,

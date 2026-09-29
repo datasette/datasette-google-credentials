@@ -37,6 +37,11 @@ from .errors import (
     GoogleTokenError,
     InvalidServiceAccountKey,
 )
+from .events import (
+    CredentialCreatedEvent,
+    CredentialRotatedEvent,
+    track_credential_event,
+)
 from .http import client, google_error
 from .internal_db import InternalDB
 from .models import CredentialInfo
@@ -316,7 +321,7 @@ async def add_service_account(
         # A credential nobody manages can't be shared or deleted from the UI.
         await idb.delete(row.id)
         raise
-    # Ticket 11: fire google-auth-credential-created here.
+    await track_credential_event(datasette, CredentialCreatedEvent, row, actor)
     return CredentialInfo.from_row(row, actor)
 
 
@@ -364,7 +369,7 @@ async def rotate_service_account_key(
     ):
         raise CredentialNotFound(credential_id)
     get_token_cache(datasette).evict(row.id)
-    # Ticket 11: fire the credential-rotated event here.
+    await track_credential_event(datasette, CredentialRotatedEvent, row, actor)
     updated = await idb.get(row.id)
     if updated is None:
         raise CredentialNotFound(credential_id)

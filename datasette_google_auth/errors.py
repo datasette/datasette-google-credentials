@@ -172,6 +172,12 @@ class InvalidServiceAccountKey(GoogleAuthError):
     code = "invalid_service_account_key"
 
 
+class InvalidLabel(GoogleAuthError):
+    """A credential label was empty or too long."""
+
+    code = "invalid_label"
+
+
 # --- JSON error responses -----------------------------------------------------
 
 # HTTP status per error class. ``error_response`` walks the MRO, so a subclass
@@ -184,6 +190,7 @@ _STATUS: dict[type[GoogleAuthError], int] = {
     CredentialBroken: 409,
     CredentialChanged: 409,
     InvalidServiceAccountKey: 400,
+    InvalidLabel: 400,
     GoogleTokenError: 502,
     EncryptionNotConfigured: 503,
     CredentialUndecryptable: 500,

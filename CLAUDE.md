@@ -55,13 +55,15 @@ datasette_google_auth/
 ├── config.py                # Pydantic plugin config, validated at startup
 ├── crypto.py                # SecretBox (Fernet/MultiFernet), encrypt/decrypt + lazy key rotation
 ├── errors.py                # GoogleAuthError + subclasses (stable `code`), error_response()
+├── events.py                # The five google-auth-credential-* events + mark_broken (CAS, evict, event)
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
-├── models.py                # CredentialInfo: the secret-free public view of a credential
+├── models.py                # CredentialInfo, DeleteResult: secret-free public views
 ├── oauth.py                 # Connect Google: PKCE + signed state flow, code exchange, refresh
 ├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
 ├── router.py                # Shared Router instance
+├── service.py               # Lifecycle for routes: rename / rotate / reconnect_url / delete (+ revoke)
 ├── service_account.py       # parse_key (ignores token_uri), mint_token, add / rotate SA keys
 ├── tokens.py                # Token(access_token, expires_at epoch secs, scopes); repr hides the token
 ├── token_cache.py           # TokenCache (in-memory, per-process, LRU) + get_token_cache(datasette)
@@ -79,6 +81,7 @@ tests/
 ├── test_config.py
 ├── test_crypto.py
 ├── test_internal_db.py
+├── test_lifecycle.py
 ├── test_permissions.py
 ├── test_service_account.py
 ├── test_smoke.py
@@ -106,6 +109,8 @@ Planned (D13):
   `google-auth-add-service-account`, `google-auth-admin`) and three per-SA
   actions (`google-service-account-use` / `-edit` / `-manage`)
 - `datasette_acl_roles()` — User / Editor / Manager for `google-service-account`
+- `register_events()` — `google-auth-credential-created` / `-reconnected` / `-rotated` /
+  `-deleted` / `-broken` (`events.py`; no per-use events, never secrets)
 - `register_commands()` — adds the `datasette google-auth` CLI group (`cli.py`)
 - `startup()` — validates plugin config and Fernet key format (bad config → `StartupError`), creates the per-process token cache, then applies internal-DB migrations
 

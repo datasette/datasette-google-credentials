@@ -45,6 +45,7 @@ from .errors import (
     CredentialNotFound,
     MissingScopes,
 )
+from .events import mark_broken
 from .http import client
 from .internal_db import CredentialRow, InternalDB
 from .models import CredentialInfo
@@ -164,25 +165,21 @@ async def _authorize(
 
 
 async def _service_account_token(
-    datasette: Datasette, row: CredentialRow, scopes: list[str]
+    datasette: Datasette, row: CredentialRow, scopes: list[str], actor_id: str
 ) -> Token:
     """Mint a token for a service account. On ``invalid_grant`` mark the row
-    broken (compare-and-swap on the key that was rejected) and raise
-    ``CredentialBroken``."""
-    blob = row.secret_encrypted
+    broken (compare-and-swap on the key that was rejected, which evicts the
+    cache and fires the broken event) and raise ``CredentialBroken``."""
     secret = await decrypt_credential(datasette, row)
     key = ServiceAccountKey.from_secret(secret, client_id=row.google_subject)
     try:
         return await mint_service_account_token(datasette, key, scopes)
     except CredentialBroken:
-        idb = InternalDB(datasette.get_internal_database())
-        if not await idb.mark_broken(row.id, SA_BROKEN_DETAIL, expected_secret=blob):
+        if not await mark_broken(datasette, row, SA_BROKEN_DETAIL, actor_id=actor_id):
             # The key was rotated (or the row deleted) meanwhile: the rejected
             # key is no longer stored, so don't break the row. Trying again
             # re-reads it.
             raise CredentialChanged(row.id) from None
-        get_token_cache(datasette).evict(row.id)
-        # Ticket 11: fire the credential-broken event here.
         raise CredentialBroken(SA_BROKEN_DETAIL, credential_id=row.id) from None
 
 
@@ -202,7 +199,7 @@ async def _token_for_row(
     requested = sorted(set(scopes))
 
     async def fetch_service_account() -> Token:
-        return await _service_account_token(datasette, row, requested)
+        return await _service_account_token(datasette, row, requested, actor_id)
 
     return await cache.get_or_fetch(
         CacheKey.for_row(row, requested), fetch_service_account
