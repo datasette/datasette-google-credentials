@@ -1,13 +1,17 @@
 """Exceptions raised by datasette-google-auth.
 
 Every error subclasses ``GoogleAuthError`` and carries a stable ``code``
-string, so consumers (and ticket 10's JSON error helper) can branch on it
-without matching message text.
+string, so consumers can branch on it without matching message text.
+``error_response()`` turns any of them into a consistent JSON error.
 
 Messages are shown to users: never put a token, key or ciphertext in one.
 """
 
 from __future__ import annotations
+
+from typing import Any
+
+from datasette import Response
 
 ENCRYPTION_NOT_CONFIGURED = "datasette-google-auth needs `encryption-key` configured"
 
@@ -103,16 +107,35 @@ class CredentialChanged(GoogleAuthError):
 
 
 class MissingScopes(GoogleAuthError):
-    """An OAuth credential wasn't granted every requested scope."""
+    """An OAuth credential wasn't granted every requested scope.
+
+    ``reconnect_url`` is set when reconnecting can fix it: every missing
+    scope is in the configured ``scopes``, which connect asks for again.
+    ``not_configured`` lists missing scopes this instance never requests;
+    only an administrator adding them to ``scopes`` can fix those.
+    """
 
     code = "missing_scopes"
 
-    def __init__(self, missing: list[str], *, reconnect_url: str | None = None):
+    def __init__(
+        self,
+        missing: list[str],
+        *,
+        reconnect_url: str | None = None,
+        not_configured: list[str] | None = None,
+    ):
         self.missing = list(missing)
         self.reconnect_url = reconnect_url
-        super().__init__(
-            "Credential is missing required scopes: " + " ".join(self.missing)
-        )
+        self.not_configured = list(not_configured or [])
+        message = "Credential is missing required scopes: " + " ".join(self.missing)
+        if self.not_configured:
+            message += (
+                ". This Datasette instance doesn't request "
+                + " ".join(self.not_configured)
+                + ": an administrator must add it to the datasette-google-auth"
+                " `scopes` setting"
+            )
+        super().__init__(message)
 
 
 class GoogleTokenError(GoogleAuthError):
@@ -147,3 +170,50 @@ class InvalidServiceAccountKey(GoogleAuthError):
     exchange. The message names the problem and never echoes key material."""
 
     code = "invalid_service_account_key"
+
+
+# --- JSON error responses -----------------------------------------------------
+
+# HTTP status per error class. ``error_response`` walks the MRO, so a subclass
+# added later inherits its parent's status (``GoogleAuthError`` itself: 500).
+_STATUS: dict[type[GoogleAuthError], int] = {
+    CredentialNotFound: 404,
+    CredentialForbidden: 403,
+    # RFC 6750 `insufficient_scope` is a 403 too; `code` tells them apart.
+    MissingScopes: 403,
+    CredentialBroken: 409,
+    CredentialChanged: 409,
+    InvalidServiceAccountKey: 400,
+    GoogleTokenError: 502,
+    EncryptionNotConfigured: 503,
+    CredentialUndecryptable: 500,
+    GoogleAuthError: 500,
+}
+
+
+def error_status(exc: GoogleAuthError) -> int:
+    """The HTTP status ``error_response`` uses for ``exc``."""
+    for cls in type(exc).__mro__:
+        status = _STATUS.get(cls)
+        if status is not None:
+            return status
+    return 500
+
+
+def error_response(exc: GoogleAuthError) -> Response:
+    """A consumer-facing JSON error for any ``GoogleAuthError``::
+
+        {"ok": false, "error": "<message>", "code": "<exc.code>",
+         "reconnect_url": "...",   # only when reconnecting can fix it
+         "missing": [...]}         # MissingScopes only
+
+    Messages never contain secrets (see the module docstring), so ``error``
+    is safe to show.
+    """
+    body: dict[str, Any] = {"ok": False, "error": str(exc), "code": exc.code}
+    reconnect_url = getattr(exc, "reconnect_url", None)
+    if reconnect_url:
+        body["reconnect_url"] = reconnect_url
+    if isinstance(exc, MissingScopes):
+        body["missing"] = exc.missing
+    return Response.json(body, status=error_status(exc))

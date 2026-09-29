@@ -49,11 +49,12 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 
 ```
 datasette_google_auth/
-├── __init__.py              # Plugin hooks only
+├── __init__.py              # Plugin hooks + re-exports the public broker API (`__all__`)
+├── broker.py                # list_credentials / get_credential / Credential.token() + .request()
 ├── cli.py                   # `datasette google-auth generate-key | rotate-keys`
 ├── config.py                # Pydantic plugin config, validated at startup
 ├── crypto.py                # SecretBox (Fernet/MultiFernet), encrypt/decrypt + lazy key rotation
-├── errors.py                # GoogleAuthError + subclasses, each with a stable `code`
+├── errors.py                # GoogleAuthError + subclasses (stable `code`), error_response()
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
@@ -72,6 +73,7 @@ tests/
 ├── conftest.py              # Imports shared fixtures; later tickets add theirs here
 ├── fixtures_google.py       # mock_google fixture, service_account_keys, network block
 ├── mock_google/             # In-process mock Google (OAuth, SA tokens, minimal Sheets)
+├── test_broker.py
 ├── test_mock_google.py
 ├── test_oauth.py
 ├── test_config.py
@@ -118,7 +120,8 @@ Planned (D13):
 - Never call `datasette.allowed()` for an OAuth credential: access is
   `owner_id == actor.id`, hard-coded.
 - `get_credential()` always re-reads the row and re-checks access before
-  consulting the token cache.
+  consulting the token cache, and so does every `Credential.token()` /
+  `.request()`, so a held `Credential` never outlives a revocation.
 - No secrets, tokens or key material in responses, logs, events, errors or telemetry.
 - Google URLs come only from config. Never honour a key file's `token_uri`.
 - The default test suite never contacts real Google; use the `mock_google`
@@ -127,7 +130,7 @@ Planned (D13):
 
 ## Key Conventions
 
-- **`__init__.py` is hooks only.** Logic goes in its own module.
+- **`__init__.py` is hooks only** (plus re-exports of the public API). Logic goes in its own module.
 - **`datasette.allowed(...)` is keyword-only.**
 - **httpx2, not httpx.**
 - **Svelte 5 runes**: `$state()`, `$derived()`, `$effect()`, `$props()`

@@ -5,6 +5,7 @@ from datasette_acl.grants import Principal, grant
 from datasette_acl.roles import roles_for
 from datasette_acl.utils import resource_exists
 
+from datasette_google_auth import CredentialNotFound, get_credential
 from datasette_google_auth.internal_db import InternalDB
 from datasette_google_auth.permissions import (
     ADD_SERVICE_ACCOUNT,
@@ -255,18 +256,8 @@ async def test_permissions_block_on_oauth_id_is_inert():
     assert await usable_sa_ids(datasette, ALICE) == []
 
 
-@pytest.mark.xfail(
-    reason="End-to-end check needs the broker (ticket 10)",
-    raises=ImportError,
-    strict=True,
-)
 @pytest.mark.asyncio
 async def test_acl_grant_on_oauth_id_does_not_make_it_usable(datasette):
-    from datasette_google_auth import (  # type: ignore[attr-defined]
-        CredentialNotFound,
-        get_credential,
-    )
-
     oauth = await add_oauth(datasette)
     await grant(
         datasette,

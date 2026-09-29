@@ -1,10 +1,32 @@
+"""datasette-google-auth: Google credentials and a token broker for Datasette.
+
+This module holds the plugin hooks and re-exports the consumer API (D11);
+the implementation lives in ``broker.py`` and ``errors.py``.
+"""
+
 from datasette import hookimpl
 from datasette.utils import StartupError
 from sqlite_utils import Database as SqliteUtilsDatabase
 
+from .broker import Credential, get_credential, list_credentials
 from .config import PLUGIN_NAME, load_config
 from .crypto import InvalidEncryptionKey, build_box
+from .errors import (
+    CredentialBroken,
+    CredentialChanged,
+    CredentialForbidden,
+    CredentialNotFound,
+    CredentialUndecryptable,
+    EncryptionNotConfigured,
+    GoogleAuthError,
+    GoogleTokenError,
+    InvalidServiceAccountKey,
+    MissingScopes,
+    error_response,
+)
 from .internal_migrations import internal_migrations
+from .models import CredentialInfo
+from .oauth import connect_url
 from .permissions import acl_roles, actions
 from .router import router
 
@@ -13,6 +35,25 @@ from .routes import api, pages
 from .token_cache import TokenCache
 
 _ = (pages, api)
+
+__all__ = [
+    "Credential",
+    "CredentialBroken",
+    "CredentialChanged",
+    "CredentialForbidden",
+    "CredentialInfo",
+    "CredentialNotFound",
+    "CredentialUndecryptable",
+    "EncryptionNotConfigured",
+    "GoogleAuthError",
+    "GoogleTokenError",
+    "InvalidServiceAccountKey",
+    "MissingScopes",
+    "connect_url",
+    "error_response",
+    "get_credential",
+    "list_credentials",
+]
 
 
 @hookimpl
