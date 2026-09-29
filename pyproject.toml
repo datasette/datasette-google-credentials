@@ -73,6 +73,11 @@ include = ["datasette_google_auth*"]
 [tool.ty.src]
 exclude = ["tests/", "samples/", "frontend/"]
 
+# The editable path sources above install through a setuptools import-hook
+# finder, which ty can't follow; point it at the same checkouts.
+[tool.ty.environment]
+extra-paths = ["../datasette-acl", "../datasette-acl-share"]
+
 # Keep the formatter out of Markdown (ruff 0.16 formats code blocks in .md).
 [tool.ruff.format]
 exclude = ["*.md"]

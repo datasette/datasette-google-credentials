@@ -3,6 +3,7 @@ from sqlite_utils import Database as SqliteUtilsDatabase
 
 from .config import load_config
 from .internal_migrations import internal_migrations
+from .permissions import acl_roles, actions
 from .router import router
 
 # Import route modules to trigger registration on the shared router
@@ -14,6 +15,16 @@ _ = (pages, api)
 @hookimpl
 def register_routes():
     return router.routes()
+
+
+@hookimpl
+def register_actions(datasette):
+    return actions()
+
+
+@hookimpl
+def datasette_acl_roles(datasette):
+    return acl_roles()
 
 
 @hookimpl

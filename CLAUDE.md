@@ -52,6 +52,7 @@ datasette_google_auth/
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
+├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
 ├── router.py                # Shared Router instance
 └── routes/
     ├── pages.py             # Page routes (render HTML)
@@ -61,6 +62,7 @@ tests/
 ├── conftest.py              # Shared fixtures (mock Google lands in ticket 06)
 ├── test_config.py
 ├── test_internal_db.py
+├── test_permissions.py
 └── test_smoke.py
 ```
 
@@ -79,6 +81,10 @@ Planned (D13):
 ## Hooks Used
 
 - `register_routes()` — registers all routes from the shared router
+- `register_actions()` — three global actions (`google-auth-connect`,
+  `google-auth-add-service-account`, `google-auth-admin`) and three per-SA
+  actions (`google-service-account-use` / `-edit` / `-manage`)
+- `datasette_acl_roles()` — User / Editor / Manager for `google-service-account`
 - `startup()` — validates plugin config (bad config → `StartupError`), then applies internal-DB migrations
 
 ## Environment Variables
