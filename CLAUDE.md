@@ -64,7 +64,10 @@ datasette_google_auth/
     └── api.py               # API routes (return JSON)
 samples/                     # Consumer sample plugins (importer, exporter)
 tests/
-├── conftest.py              # Shared fixtures (mock Google lands in ticket 06)
+├── conftest.py              # Imports shared fixtures; later tickets add theirs here
+├── fixtures_google.py       # mock_google fixture, service_account_keys, network block
+├── mock_google/             # In-process mock Google (OAuth, SA tokens, minimal Sheets)
+├── test_mock_google.py
 ├── test_config.py
 ├── test_crypto.py
 ├── test_internal_db.py
@@ -108,7 +111,9 @@ Planned (D13):
   consulting the token cache.
 - No secrets, tokens or key material in responses, logs, events, errors or telemetry.
 - Google URLs come only from config. Never honour a key file's `token_uri`.
-- The default test suite never contacts real Google; use the mock fixture.
+- The default test suite never contacts real Google; use the `mock_google`
+  fixture (`tests/fixtures_google.py`). Internet sockets and DNS are blocked
+  for the whole suite.
 
 ## Key Conventions
 
