@@ -48,6 +48,8 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 ```
 datasette_google_auth/
 ├── __init__.py              # Plugin hooks only
+├── config.py                # Pydantic plugin config, validated at startup
+├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── router.py                # Shared Router instance
 └── routes/
     ├── pages.py             # Page routes (render HTML)
@@ -55,6 +57,7 @@ datasette_google_auth/
 samples/                     # Consumer sample plugins (importer, exporter)
 tests/
 ├── conftest.py              # Shared fixtures (mock Google lands in ticket 06)
+├── test_config.py
 └── test_smoke.py
 ```
 
@@ -73,7 +76,7 @@ Planned (D13):
 ## Hooks Used
 
 - `register_routes()` — registers all routes from the shared router
-- `startup()` — placeholder; config validation and migrations arrive in tickets 02/03
+- `startup()` — validates plugin config (bad config → `StartupError`); migrations arrive in ticket 03
 
 ## Environment Variables
 
