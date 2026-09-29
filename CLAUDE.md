@@ -53,12 +53,14 @@ datasette_google_auth/
 ├── cli.py                   # `datasette google-auth generate-key | rotate-keys`
 ├── config.py                # Pydantic plugin config, validated at startup
 ├── crypto.py                # SecretBox (Fernet/MultiFernet), encrypt/decrypt + lazy key rotation
-├── errors.py                # GoogleAuthError and subclasses (ticket 10 adds the rest)
+├── errors.py                # GoogleAuthError + subclasses, each with a stable `code`
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
+├── models.py                # CredentialInfo: the secret-free public view of a credential
 ├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
 ├── router.py                # Shared Router instance
+├── service_account.py       # parse_key (ignores token_uri), mint_token, add / rotate SA keys
 ├── tokens.py                # Token(access_token, expires_at epoch secs, scopes); repr hides the token
 ├── token_cache.py           # TokenCache (in-memory, per-process, LRU) + get_token_cache(datasette)
 └── routes/
@@ -74,6 +76,7 @@ tests/
 ├── test_crypto.py
 ├── test_internal_db.py
 ├── test_permissions.py
+├── test_service_account.py
 ├── test_smoke.py
 └── test_token_cache.py
 ```
