@@ -89,6 +89,19 @@ class CredentialBroken(GoogleAuthError):
         super().__init__(f"{subject} was rejected by Google: {detail}")
 
 
+class CredentialChanged(GoogleAuthError):
+    """The credential was replaced (reconnected, rotated) while it was being
+    used, twice in a row. Nothing was written; trying again should work."""
+
+    code = "credential_changed"
+
+    def __init__(self, credential_id: str):
+        self.credential_id = credential_id
+        super().__init__(
+            f"Credential {credential_id} changed while it was being used — try again"
+        )
+
+
 class MissingScopes(GoogleAuthError):
     """An OAuth credential wasn't granted every requested scope."""
 

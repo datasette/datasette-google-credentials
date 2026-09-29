@@ -37,7 +37,7 @@ from .errors import (
     GoogleTokenError,
     InvalidServiceAccountKey,
 )
-from .http import client
+from .http import client, google_error
 from .internal_db import InternalDB
 from .models import CredentialInfo
 from .permissions import (
@@ -62,9 +62,6 @@ SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
 # The fields kept, encrypted, in ``secret_encrypted`` (D15). ``client_id``
 # is kept too but stored in the ``google_subject`` column: it isn't secret.
 SECRET_FIELDS = ("client_email", "private_key", "private_key_id", "project_id")
-
-# Google's error_description is safe to show, but cap it anyway.
-_MAX_DETAIL = 300
 
 
 @dataclass(frozen=True)
@@ -189,21 +186,6 @@ def build_assertion(
     )
 
 
-def _oauth_error(response: httpx2.Response) -> tuple[str | None, str | None]:
-    """Google's ``error`` and ``error_description``, if the body has them."""
-    try:
-        body = response.json()
-    except ValueError:
-        return None, None
-    if not isinstance(body, dict):
-        return None, None
-    error, description = body.get("error"), body.get("error_description")
-    return (
-        error if isinstance(error, str) else None,
-        description[:_MAX_DETAIL] if isinstance(description, str) else None,
-    )
-
-
 async def mint_token(
     http: httpx2.AsyncClient,
     key: ServiceAccountKey,
@@ -232,7 +214,7 @@ async def mint_token(
         raise GoogleTokenError(None, type(ex).__name__) from None
 
     if response.status_code != 200:
-        error, description = _oauth_error(response)
+        error, description = google_error(response)
         if error == "invalid_grant":
             raise CredentialBroken(description or "invalid_grant")
         raise GoogleTokenError(response.status_code, error, description)

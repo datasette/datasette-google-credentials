@@ -210,21 +210,32 @@ class InternalDB:
         return await self._get_existing(id), created
 
     async def update_secret(
-        self, id: str, secret_encrypted: bytes, *, actor_id: str
+        self,
+        id: str,
+        secret_encrypted: bytes,
+        *,
+        actor_id: str,
+        expected_secret: bytes | None = None,
     ) -> bool:
         """Replace the stored secret (key rotation) and clear a broken status.
 
         Bumps ``updated_at``, which the token cache uses to spot rotation.
+        With ``expected_secret``, a compare-and-swap: applies only if the row
+        still holds exactly that blob, so a concurrent reconnect or rotation
+        is never overwritten. Returns False if nothing was updated.
         """
 
         def update_credential_secret(conn) -> bool:
-            cursor = conn.execute(
+            sql = (
                 f"UPDATE {TABLE} SET secret_encrypted = ?, status = 'ok',"
                 f" status_detail = NULL, updated_at = {NOW}, updated_by = ?"
-                " WHERE id = ?",
-                [secret_encrypted, actor_id, id],
+                " WHERE id = ?"
             )
-            return cursor.rowcount > 0
+            params: list = [secret_encrypted, actor_id, id]
+            if expected_secret is not None:
+                sql += " AND secret_encrypted = ?"
+                params.append(expected_secret)
+            return conn.execute(sql, params).rowcount > 0
 
         return await self.db.execute_write_fn(update_credential_secret)
 
@@ -257,18 +268,26 @@ class InternalDB:
 
         return await self.db.execute_write_fn(rename_credential)
 
-    async def mark_broken(self, id: str, detail: str) -> bool:
+    async def mark_broken(
+        self, id: str, detail: str, *, expected_secret: bytes | None = None
+    ) -> bool:
         """Flag a credential as unusable (e.g. ``invalid_grant``).
 
-        ``detail`` is shown to users: never put a token or key in it.
+        ``detail`` is shown to users: never put a token or key in it. With
+        ``expected_secret``, applies only if the row still holds exactly that
+        blob: a secret Google rejected must not break a row a reconnect has
+        since replaced. Returns False if nothing was updated.
         """
 
         def mark_credential_broken(conn) -> bool:
-            cursor = conn.execute(
-                f"UPDATE {TABLE} SET status = 'broken', status_detail = ? WHERE id = ?",
-                [detail, id],
+            sql = (
+                f"UPDATE {TABLE} SET status = 'broken', status_detail = ? WHERE id = ?"
             )
-            return cursor.rowcount > 0
+            params: list = [detail, id]
+            if expected_secret is not None:
+                sql += " AND secret_encrypted = ?"
+                params.append(expected_secret)
+            return conn.execute(sql, params).rowcount > 0
 
         return await self.db.execute_write_fn(mark_credential_broken)
 

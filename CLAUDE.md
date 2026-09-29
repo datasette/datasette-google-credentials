@@ -58,13 +58,14 @@ datasette_google_auth/
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
 ├── models.py                # CredentialInfo: the secret-free public view of a credential
+├── oauth.py                 # Connect Google: PKCE + signed state flow, code exchange, refresh
 ├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
 ├── router.py                # Shared Router instance
 ├── service_account.py       # parse_key (ignores token_uri), mint_token, add / rotate SA keys
 ├── tokens.py                # Token(access_token, expires_at epoch secs, scopes); repr hides the token
 ├── token_cache.py           # TokenCache (in-memory, per-process, LRU) + get_token_cache(datasette)
 └── routes/
-    ├── pages.py             # Page routes (render HTML)
+    ├── pages.py             # Page routes (render HTML) + OAuth connect/callback redirects
     └── api.py               # API routes (return JSON)
 samples/                     # Consumer sample plugins (importer, exporter)
 tests/
@@ -72,6 +73,7 @@ tests/
 ├── fixtures_google.py       # mock_google fixture, service_account_keys, network block
 ├── mock_google/             # In-process mock Google (OAuth, SA tokens, minimal Sheets)
 ├── test_mock_google.py
+├── test_oauth.py
 ├── test_config.py
 ├── test_crypto.py
 ├── test_internal_db.py
@@ -87,10 +89,12 @@ Planned per the house layout (D18): `page_data.py`,
 
 ## Routes
 
+- `GET /-/google-auth/connect?return_to=/...` → start OAuth connect (404 without
+  `client_id`/`client_secret`, 403 without `google-auth-connect`)
+- `GET /-/google-auth/oauth/callback` → OAuth redirect URI
+
 Planned (D13):
 - `GET /-/google-auth` → management page
-- `GET /-/google-auth/connect?return_to=/...` → start OAuth connect
-- `GET /-/google-auth/oauth/callback` → OAuth redirect URI
 - `GET /-/google-auth/api/credentials?scopes=...` → mirrors `list_credentials()`
 
 ## Hooks Used

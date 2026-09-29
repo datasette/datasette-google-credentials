@@ -37,3 +37,24 @@ def client(datasette: Datasette) -> httpx2.AsyncClient:
     return httpx2.AsyncClient(
         transport=transport, timeout=TIMEOUT, follow_redirects=False
     )
+
+
+# Google's error_description is safe to show, but cap it anyway.
+MAX_ERROR_DETAIL = 300
+
+
+def google_error(response: httpx2.Response) -> tuple[str | None, str | None]:
+    """Google's OAuth ``error`` and ``error_description`` from a reply body,
+    each ``None`` if absent or not a string. The description (which carries
+    no secrets) is capped at ``MAX_ERROR_DETAIL`` characters."""
+    try:
+        body = response.json()
+    except ValueError:
+        return None, None
+    if not isinstance(body, dict):
+        return None, None
+    error, description = body.get("error"), body.get("error_description")
+    return (
+        error if isinstance(error, str) else None,
+        description[:MAX_ERROR_DETAIL] if isinstance(description, str) else None,
+    )
