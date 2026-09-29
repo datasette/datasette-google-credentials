@@ -42,13 +42,18 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 | `just check` | ty + ruff lint + ruff format check |
 | `just test` | Run Python tests (pytest, asyncio strict) |
 | `just clean-dev` | Delete `.tmp/` (dev databases) |
+| `uv run datasette google-auth generate-key` | Print a new Fernet key for `encryption-key` |
+| `uv run datasette google-auth rotate-keys --internal X -c cfg.yml` | Re-encrypt every credential with the first key |
 
 ## Project Structure
 
 ```
 datasette_google_auth/
 ├── __init__.py              # Plugin hooks only
+├── cli.py                   # `datasette google-auth generate-key | rotate-keys`
 ├── config.py                # Pydantic plugin config, validated at startup
+├── crypto.py                # SecretBox (Fernet/MultiFernet), encrypt/decrypt + lazy key rotation
+├── errors.py                # GoogleAuthError and subclasses (ticket 10 adds the rest)
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
@@ -61,6 +66,7 @@ samples/                     # Consumer sample plugins (importer, exporter)
 tests/
 ├── conftest.py              # Shared fixtures (mock Google lands in ticket 06)
 ├── test_config.py
+├── test_crypto.py
 ├── test_internal_db.py
 ├── test_permissions.py
 └── test_smoke.py
@@ -85,7 +91,8 @@ Planned (D13):
   `google-auth-add-service-account`, `google-auth-admin`) and three per-SA
   actions (`google-service-account-use` / `-edit` / `-manage`)
 - `datasette_acl_roles()` — User / Editor / Manager for `google-service-account`
-- `startup()` — validates plugin config (bad config → `StartupError`), then applies internal-DB migrations
+- `register_commands()` — adds the `datasette google-auth` CLI group (`cli.py`)
+- `startup()` — validates plugin config and Fernet key format (bad config → `StartupError`), then applies internal-DB migrations
 
 ## Environment Variables
 
@@ -111,4 +118,7 @@ Planned (D13):
 - **Svelte 5 runes**: `$state()`, `$derived()`, `$effect()`, `$props()`
 - **IDs**: `python-ulid`
 - **Internal DB reads**: use `execute_write_fn()` even for reads
+- **Secrets**: encrypt with `crypto.encrypt_secret()` and read with
+  `crypto.decrypt_credential()` (lazily re-encrypts rows under an old key). Both
+  raise `EncryptionNotConfigured` without a key; never write a secret any other way.
 - **Template**: one template for all pages; routes vary `entrypoint` and `page_data`

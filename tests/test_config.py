@@ -1,3 +1,4 @@
+import base64
 import logging
 
 import httpx2
@@ -13,9 +14,10 @@ from datasette_google_auth.config import (
 )
 from datasette_google_auth.http import client, set_transport
 
-# Obviously fake values; the assertions check they never leak.
-FAKE_KEY = "fake-encryption-key-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-FAKE_OLD_KEY = "fake-old-encryption-key-BBBBBBBBBBBBBBBBBBBBBBBBBBB="
+# Obviously fake values; the assertions check they never leak. Keys must be
+# well-formed Fernet keys (32 url-safe base64 bytes) or startup rejects them.
+FAKE_KEY = base64.urlsafe_b64encode(b"fake-encryption-key-for-tests-01").decode()
+FAKE_OLD_KEY = base64.urlsafe_b64encode(b"fake-encryption-key-for-tests-02").decode()
 FAKE_SECRET = "fake-client-secret-CCCCCCCC"
 
 

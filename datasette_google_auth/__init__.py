@@ -1,7 +1,9 @@
 from datasette import hookimpl
+from datasette.utils import StartupError
 from sqlite_utils import Database as SqliteUtilsDatabase
 
-from .config import load_config
+from .config import PLUGIN_NAME, load_config
+from .crypto import InvalidEncryptionKey, build_box
 from .internal_migrations import internal_migrations
 from .permissions import acl_roles, actions
 from .router import router
@@ -28,12 +30,27 @@ def datasette_acl_roles(datasette):
 
 
 @hookimpl
+def register_commands(cli):
+    from .cli import google_auth
+
+    cli.add_command(google_auth)
+
+
+@hookimpl
 def startup(datasette):
     async def inner():
         # Validate plugin config first, so a bad config fails startup (with a
         # StartupError naming the bad key) before anything touches the
         # internal database.
-        datasette._google_auth_config = load_config(datasette)
+        config = load_config(datasette)
+        try:
+            build_box(config.encryption_keys)
+        except InvalidEncryptionKey as error:
+            raise StartupError(
+                f"Invalid {PLUGIN_NAME} plugin configuration:\n"
+                f"  encryption-key: {error}"
+            ) from None
+        datasette._google_auth_config = config
 
         def apply_google_auth_migrations(connection):
             internal_migrations.apply(SqliteUtilsDatabase(connection))

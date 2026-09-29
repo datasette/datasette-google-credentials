@@ -228,6 +228,24 @@ class InternalDB:
 
         return await self.db.execute_write_fn(update_credential_secret)
 
+    async def reencrypt_secret(self, id: str, *, old: bytes, new: bytes) -> bool:
+        """Swap in the same secret re-encrypted under a newer key.
+
+        Unlike ``update_secret`` this is not an edit: status, ``updated_*``
+        and the token cache are untouched. Only applies if the row still
+        holds ``old``, so a concurrent real update is never overwritten.
+        """
+
+        def reencrypt_credential_secret(conn) -> bool:
+            cursor = conn.execute(
+                f"UPDATE {TABLE} SET secret_encrypted = ?"
+                " WHERE id = ? AND secret_encrypted = ?",
+                [new, id, old],
+            )
+            return cursor.rowcount > 0
+
+        return await self.db.execute_write_fn(reencrypt_credential_secret)
+
     async def rename(self, id: str, label: str, *, actor_id: str) -> bool:
         def rename_credential(conn) -> bool:
             cursor = conn.execute(

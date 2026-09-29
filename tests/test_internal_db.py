@@ -345,6 +345,23 @@ async def test_update_secret(idb):
 
 
 @pytest.mark.asyncio
+async def test_reencrypt_secret(idb):
+    row = await add_sa(idb)
+    await idb.mark_broken(row.id, "key deleted")
+    # Only swaps if the row still holds the old ciphertext
+    assert not await idb.reencrypt_secret(row.id, old=b"stale", new=SECRET_2)
+    assert (await idb.get(row.id)).secret_encrypted == SECRET
+    assert await idb.reencrypt_secret(row.id, old=SECRET, new=SECRET_2)
+    after = await idb.get(row.id)
+    assert after.secret_encrypted == SECRET_2
+    # Not an edit: status and updated_* untouched
+    assert after.status == "broken"
+    assert after.updated_at is None
+    assert after.updated_by is None
+    assert not await idb.reencrypt_secret("missing", old=SECRET, new=SECRET_2)
+
+
+@pytest.mark.asyncio
 async def test_rename(idb):
     row = await add_sa(idb)
     assert await idb.rename(row.id, "New name", actor_id="bob")
