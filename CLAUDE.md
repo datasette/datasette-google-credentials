@@ -50,6 +50,8 @@ datasette_google_auth/
 ├── __init__.py              # Plugin hooks only
 ├── config.py                # Pydantic plugin config, validated at startup
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
+├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
+├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
 ├── router.py                # Shared Router instance
 └── routes/
     ├── pages.py             # Page routes (render HTML)
@@ -58,11 +60,12 @@ samples/                     # Consumer sample plugins (importer, exporter)
 tests/
 ├── conftest.py              # Shared fixtures (mock Google lands in ticket 06)
 ├── test_config.py
+├── test_internal_db.py
 └── test_smoke.py
 ```
 
-Planned per the house layout (D18): `page_data.py`, `internal_db.py`,
-`internal_migrations.py`, `templates/google_auth_base.html`, `frontend/`,
+Planned per the house layout (D18): `page_data.py`,
+`templates/google_auth_base.html`, `frontend/`,
 `scripts/typegen-pagedata.py`. Update this file as they land.
 
 ## Routes
@@ -76,7 +79,7 @@ Planned (D13):
 ## Hooks Used
 
 - `register_routes()` — registers all routes from the shared router
-- `startup()` — validates plugin config (bad config → `StartupError`); migrations arrive in ticket 03
+- `startup()` — validates plugin config (bad config → `StartupError`), then applies internal-DB migrations
 
 ## Environment Variables
 

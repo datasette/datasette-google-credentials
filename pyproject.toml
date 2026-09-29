@@ -18,7 +18,7 @@ dependencies = [
     "pydantic>=2",
     "sqlite-migrate>=0.1b0",
     "sqlite-utils>=3.38",
-    "python-ulid",
+    "python-ulid>=4",
     "pyjwt[crypto]",
     "cryptography",
     "httpx2>=2.0",
