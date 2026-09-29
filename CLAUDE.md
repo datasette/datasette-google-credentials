@@ -59,6 +59,8 @@ datasette_google_auth/
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
 ├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
 ├── router.py                # Shared Router instance
+├── tokens.py                # Token(access_token, expires_at epoch secs, scopes); repr hides the token
+├── token_cache.py           # TokenCache (in-memory, per-process, LRU) + get_token_cache(datasette)
 └── routes/
     ├── pages.py             # Page routes (render HTML)
     └── api.py               # API routes (return JSON)
@@ -72,7 +74,8 @@ tests/
 ├── test_crypto.py
 ├── test_internal_db.py
 ├── test_permissions.py
-└── test_smoke.py
+├── test_smoke.py
+└── test_token_cache.py
 ```
 
 Planned per the house layout (D18): `page_data.py`,
@@ -95,7 +98,7 @@ Planned (D13):
   actions (`google-service-account-use` / `-edit` / `-manage`)
 - `datasette_acl_roles()` — User / Editor / Manager for `google-service-account`
 - `register_commands()` — adds the `datasette google-auth` CLI group (`cli.py`)
-- `startup()` — validates plugin config and Fernet key format (bad config → `StartupError`), then applies internal-DB migrations
+- `startup()` — validates plugin config and Fernet key format (bad config → `StartupError`), creates the per-process token cache, then applies internal-DB migrations
 
 ## Environment Variables
 

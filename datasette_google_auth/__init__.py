@@ -10,6 +10,7 @@ from .router import router
 
 # Import route modules to trigger registration on the shared router
 from .routes import api, pages
+from .token_cache import TokenCache
 
 _ = (pages, api)
 
@@ -51,6 +52,8 @@ def startup(datasette):
                 f"  encryption-key: {error}"
             ) from None
         datasette._google_auth_config = config
+        # Access tokens live only in memory, per process (D7).
+        datasette._google_auth_tokens = TokenCache()
 
         def apply_google_auth_migrations(connection):
             internal_migrations.apply(SqliteUtilsDatabase(connection))
