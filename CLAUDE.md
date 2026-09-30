@@ -9,7 +9,7 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 
 - `wiki/` and `todos/` are local notes, excluded via `.git/info/exclude`. Never
   commit them or add them to `.gitignore`.
-- **Decisions are binding and live in `wiki/01-decisions.md` (D1–D18).** Read it
+- **Decisions are binding and live in `wiki/01-decisions.md`.** Read it
   before starting work. If a ticket conflicts with it, the decisions file wins.
   Record new decisions there and follow-ups in `wiki/90-future-ideas.md`.
 - Tickets for v0 are in `todos/v0/` (index and shared context in `todos/v0/README.md`).

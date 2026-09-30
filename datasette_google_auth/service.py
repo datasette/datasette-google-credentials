@@ -77,8 +77,10 @@ SERVICE_ACCOUNT = "service_account"
 
 MAX_LABEL_LENGTH = 200
 
-# UNVERIFIED (ticket 11): taken from the ticket; no local source confirms
-# it. Check against the live Cloud console before release.
+# The base URL is from Google's docs
+# (https://docs.cloud.google.com/iam/docs/keys-create-delete). UNVERIFIED:
+# the ``?project=`` parameter cloud_console_url() adds; check it against the
+# live Cloud console before release.
 CLOUD_CONSOLE_SERVICE_ACCOUNTS = (
     "https://console.cloud.google.com/iam-admin/serviceaccounts"
 )
@@ -125,8 +127,8 @@ def clean_label(label: str) -> str:
 
 
 def cloud_console_url(project_id: str) -> str:
-    """The Cloud console's service-accounts page for a project (UNVERIFIED
-    format, see ``CLOUD_CONSOLE_SERVICE_ACCOUNTS``)."""
+    """The Cloud console's service-accounts page for a project (the
+    ``?project=`` parameter is UNVERIFIED, see ``CLOUD_CONSOLE_SERVICE_ACCOUNTS``)."""
     return CLOUD_CONSOLE_SERVICE_ACCOUNTS + "?" + urlencode({"project": project_id})
 
 

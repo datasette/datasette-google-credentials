@@ -67,7 +67,8 @@ Pass it to Datasette through an environment variable, never on the command
 line or in a committed file.
 
 Without an `encryption-key` the plugin still starts, but nobody can add a
-credential and the management page shows a setup notice. A malformed key
+credential and the management page shows a setup notice (see
+[The management page](#the-management-page)). A malformed key
 stops Datasette from starting.
 
 ### 2. Run with a persistent internal database
@@ -91,9 +92,9 @@ plugins:
     # Optional: both are needed for "Connect Google". Without them, only
     # service accounts are available.
     client_id:
-      $env: GOOGLE_OAUTH_CLIENT_ID
+      $env: DATASETTE_GOOGLE_AUTH_CLIENT_ID
     client_secret:
-      $env: GOOGLE_OAUTH_CLIENT_SECRET
+      $env: DATASETTE_GOOGLE_AUTH_CLIENT_SECRET
     # Optional: the scopes "Connect Google" asks for. This is the default;
     # openid and email are always added if you leave them out.
     scopes:
@@ -117,8 +118,8 @@ permissions:
 
 ```bash
 export DATASETTE_GOOGLE_AUTH_KEY="<output of datasette google-auth generate-key>"
-export GOOGLE_OAUTH_CLIENT_ID="<your-client-id>.apps.googleusercontent.com"
-export GOOGLE_OAUTH_CLIENT_SECRET="<your-client-secret>"
+export DATASETTE_GOOGLE_AUTH_CLIENT_ID="<your-client-id>.apps.googleusercontent.com"
+export DATASETTE_GOOGLE_AUTH_CLIENT_SECRET="<your-client-secret>"
 datasette serve data.db -c datasette.yaml --internal internal.db
 ```
 
@@ -169,6 +170,26 @@ key is removed too early, the affected credentials fail with
 `credential_undecryptable` ("cannot decrypt — was encryption-key changed?")
 and are left untouched: putting the old key back fixes them.
 
+## The management page
+
+`/-/google-auth` is where people connect Google accounts, add, rename,
+rotate, share and delete service accounts, and delete credentials. The
+Datasette menu links to it as "Google accounts" for signed-in actors who hold
+any of the three global actions (see [Permissions](#permissions)).
+
+- **Anonymous visitors get 403.** Any signed-in actor gets the page, even
+  without a google-auth action: a service account may have been shared with
+  them, and the page is where they find its `client_email` to share sheets
+  with.
+- **Connect Google and Reconnect come back to the page**, and report the
+  result as Datasette flash messages: connected, cancelled, or connected
+  without every requested scope (with a prompt to reconnect).
+- **Setup notices** appear when something is missing: the `encryption-key`,
+  the OAuth client, or a persistent internal database. The fix (config
+  snippets, and the exact redirect URI to register) is shown only to
+  `google-auth-admin` actors, which includes root under `--root`; everyone
+  else sees a short notice to ask an admin.
+
 ## Google Cloud setup for "Connect Google"
 
 Skip this section if you only want service accounts.
@@ -200,12 +221,13 @@ Skip this section if you only want service accounts.
    ```
 
    Datasette builds it from the incoming request, so it must match the scheme
-   and host your users see. The management page shows the exact URI your
-   instance will send. Behind a proxy that rewrites the host or scheme, set
-   `redirect_uri` in the plugin config to the public URL and register that.
+   and host your users see. Until the client is configured, the management
+   page shows admins the exact URI your instance will send. Behind a proxy
+   that rewrites the host or scheme, set `redirect_uri` in the plugin config
+   to the public URL and register that.
 5. Put the client ID and secret in the environment variables your
-   `datasette.yaml` reads (`GOOGLE_OAUTH_CLIENT_ID` and
-   `GOOGLE_OAUTH_CLIENT_SECRET` above) and restart.
+   `datasette.yaml` reads (`DATASETTE_GOOGLE_AUTH_CLIENT_ID` and
+   `DATASETTE_GOOGLE_AUTH_CLIENT_SECRET` above) and restart.
 
 Connecting always asks for `access_type=offline` and `prompt=consent`, with
 PKCE and a signed, actor-bound `state`, so that Google returns a refresh
@@ -255,10 +277,8 @@ access to their Google account at any time. Google's current help page says
 to do it from the "linked apps" page,
 [myaccount.google.com/linkedapps](https://myaccount.google.com/linkedapps)
 ([Google: manage links between your Google Account and third-party apps](https://support.google.com/accounts/answer/13533235)).
-The plugin's own messages mention `myaccount.google.com/permissions`, an
-older address this README could not confirm in Google's current
-documentation. The next token refresh then fails, and the credential is
-marked broken.
+The plugin's own messages point there too. The next token refresh then
+fails, and the credential is marked broken.
 
 **Unverified:** whether Google's token response reports the `email` scope as
 `email` or as `https://www.googleapis.com/auth/userinfo.email`. Google's
@@ -552,8 +572,10 @@ same-origin path.
 A minimal plugin that previews the first rows of a spreadsheet as JSON,
 trimmed from the importer sample. Save it in a plugins directory and open
 `/-/sheet-preview` to list credentials, then
-`/-/sheet-preview?credential=<id>&spreadsheet=<spreadsheet id>`.
+`/-/sheet-preview?credential=<id>&spreadsheet=<spreadsheet id>`. The test
+suite runs this exact code (`tests/test_readme.py`).
 
+<!-- readme-consumer-example -->
 ```python
 from urllib.parse import quote
 

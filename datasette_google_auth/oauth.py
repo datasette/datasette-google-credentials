@@ -96,7 +96,7 @@ _CLOCK_SKEW = 60
 BROKEN_DETAIL = "Google access was revoked or expired — reconnect"
 NO_REFRESH_TOKEN = (
     "Google didn't return a refresh token — remove the app at"
-    " myaccount.google.com/permissions and try again"
+    " https://myaccount.google.com/linkedapps and try again"
 )
 
 _SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")

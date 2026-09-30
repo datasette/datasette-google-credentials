@@ -93,7 +93,7 @@ class DeleteResult(BaseModel):
 
     OAuth: ``revoked`` says whether Google confirmed revoking the refresh
     token; if not, ``revoke_error`` says why and the user should remove
-    access at myaccount.google.com/permissions. The row is deleted either
+    access at https://myaccount.google.com/linkedapps. The row is deleted either
     way.
 
     Service account: the key still exists at Google, so the UI should say

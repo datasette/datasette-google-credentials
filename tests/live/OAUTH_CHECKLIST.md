@@ -125,7 +125,7 @@ is the default set.
 
 1. Import something with the credential (step 9's import) so a token is
    cached, and note that it worked.
-2. At <https://myaccount.google.com/permissions>, find the app and
+2. At <https://myaccount.google.com/linkedapps>, find the app and
    **Remove all access**.
 3. Use the credential again: run the same import.
 
@@ -154,7 +154,7 @@ is the default set.
    ```
 
 - [ ] The result says `revoked: true` (the UI reports it) and the row is gone.
-- [ ] At <https://myaccount.google.com/permissions> the app no longer has
+- [ ] At <https://myaccount.google.com/linkedapps> the app no longer has
       access (reload the page).
 
 ## 8. Refresh-token expiry after 7 days in Testing (wiki D4 `← verify`)

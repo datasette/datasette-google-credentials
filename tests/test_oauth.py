@@ -401,7 +401,9 @@ async def test_missing_refresh_token(mock_google, monkeypatch):
         mock_google.oauth, "exchange_code", exchange_without_refresh_token
     )
     response = await connect(datasette, mock_google)
-    await assert_rejected(datasette, response, "myaccount.google.com/permissions")
+    await assert_rejected(
+        datasette, response, "https://myaccount.google.com/linkedapps"
+    )
 
 
 @pytest.mark.asyncio

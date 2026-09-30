@@ -80,9 +80,9 @@
         <p>
           To be sure, remove Datasette's access at
           <a
-            href="https://myaccount.google.com/permissions"
+            href="https://myaccount.google.com/linkedapps"
             target="_blank"
-            rel="noopener">myaccount.google.com/permissions</a
+            rel="noopener">myaccount.google.com/linkedapps</a
           >.
         </p>
       {/if}
