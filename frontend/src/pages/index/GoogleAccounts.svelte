@@ -51,9 +51,11 @@
 
           {#if account.status === "broken"}
             <p class="problem">
+              <!-- The stored detail (oauth.BROKEN_DETAIL) already says
+                   "reconnect"; only the fallback needs the hint. -->
               {account.status_detail ??
                 "Google stopped accepting this connection."}
-              {#if canConnect}Reconnect to fix it.{/if}
+              {#if canConnect && !account.status_detail}Reconnect to fix it.{/if}
             </p>
           {:else if account.missing_scopes.length}
             <p class="problem">

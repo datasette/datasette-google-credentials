@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from importlib.metadata import version
 from time import perf_counter
 from typing import Any
-from urllib.parse import urlsplit
 
 import httpx2
 from datasette.telemetry import SCHEMA_URL, clamp_http_method
@@ -229,9 +228,11 @@ def credential_span(span_name: SpanName, credential_id: str) -> Iterator[Span]:
 
 
 def _host(url: str) -> str | None:
+    """The URL's host only (never userinfo, path or query), parsed as the
+    httpx2 client that sends the request parses it."""
     try:
-        return urlsplit(url).hostname
-    except ValueError:
+        return httpx2.URL(url).raw_host.decode("ascii").lower() or None
+    except (httpx2.InvalidURL, TypeError, UnicodeDecodeError):
         return None
 
 

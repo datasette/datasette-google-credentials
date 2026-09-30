@@ -178,6 +178,28 @@ class InvalidLabel(GoogleAuthError):
     code = "invalid_label"
 
 
+class DisallowedHost(GoogleAuthError):
+    """``Credential.request()`` refused to send the bearer token to a URL that
+    isn't ``https://`` on a Google API host (``*.googleapis.com``) or on the
+    origin of a configured ``google_base_urls`` entry (D34). Nothing was
+    sent and no token was fetched. ``allow_any_host=True`` overrides it.
+
+    ``host`` is the refused URL's host (``None`` if it had none). The message
+    names only the scheme and host, never the path, query or userinfo.
+    """
+
+    code = "disallowed_host"
+
+    def __init__(self, origin: str, host: str | None, reason: str):
+        self.host = host
+        self.reason = reason
+        super().__init__(
+            f"Refusing to send a Google access token to {origin}: {reason}."
+            " Credential.request() only calls https://*.googleapis.com"
+            " (pass allow_any_host=True to override)"
+        )
+
+
 # --- JSON error responses -----------------------------------------------------
 
 # HTTP status per error class. ``error_response`` walks the MRO, so a subclass
@@ -191,6 +213,7 @@ _STATUS: dict[type[GoogleAuthError], int] = {
     CredentialChanged: 409,
     InvalidServiceAccountKey: 400,
     InvalidLabel: 400,
+    DisallowedHost: 400,
     GoogleTokenError: 502,
     EncryptionNotConfigured: 503,
     CredentialUndecryptable: 500,

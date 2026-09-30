@@ -5,7 +5,8 @@ Validated once at startup. A typo'd key or a bad value fails startup with a
 
 Secret-bearing keys (``encryption-key``, ``client_secret``) are named so that
 Datasette's ``/-/config`` redaction (key names containing ``key``/``secret``)
-hides them. Validation errors never echo input values.
+hides them, and are left out of ``repr(config)``. Validation errors never
+echo input values.
 """
 
 from __future__ import annotations
@@ -49,7 +50,9 @@ class Config(BaseModel):
         use_attribute_docstrings=True,
     )
 
-    encryption_key: str | list[str] | None = Field(None, alias="encryption-key")
+    encryption_key: str | list[str] | None = Field(
+        None, alias="encryption-key", repr=False
+    )
     """Fernet key used to encrypt stored secrets, usually
     ``{"$env": "DATASETTE_GOOGLE_AUTH_KEY"}``. A list enables rotation: the
     first key encrypts, all keys decrypt. Unset means credentials cannot be
@@ -58,7 +61,7 @@ class Config(BaseModel):
     client_id: str | None = None
     """OAuth client ID. With ``client_secret``, enables "Connect Google"."""
 
-    client_secret: str | None = None
+    client_secret: str | None = Field(None, repr=False)
     """OAuth client secret, usually via ``$env``."""
 
     scopes: list[str] = Field(

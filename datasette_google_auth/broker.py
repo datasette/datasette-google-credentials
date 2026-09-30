@@ -43,6 +43,7 @@ from .errors import (
     CredentialChanged,
     CredentialForbidden,
     CredentialNotFound,
+    DisallowedHost,
     MissingScopes,
 )
 from .events import mark_broken
@@ -110,6 +111,57 @@ def missing_scopes(requested: Iterable[str], granted: Iterable[str]) -> list[str
     ``spreadsheets.readonly``, never the other way round.
     """
     return sorted(set(requested) - covered_scopes(granted))
+
+
+# --- Outbound URLs (D34) ------------------------------------------------------
+
+GOOGLE_API_DOMAIN = ".googleapis.com"
+
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def _host(url: httpx2.URL) -> str:
+    # The ASCII (punycode) host, as resolved and connected to.
+    return url.raw_host.decode("ascii").lower()
+
+
+def _origin(url: httpx2.URL) -> tuple[str, str, int | None]:
+    return (url.scheme, _host(url), url.port or _DEFAULT_PORTS.get(url.scheme))
+
+
+def configured_origins(datasette: Datasette) -> set[tuple[str, str, int | None]]:
+    """``(scheme, host, port)`` of every configured ``google_base_urls``
+    entry: Google's own by default, the mock's in tests."""
+    urls = get_config(datasette).google_base_urls.model_dump().values()
+    return {_origin(httpx2.URL(url)) for url in urls}
+
+
+def check_request_url(datasette: Datasette, url: str | httpx2.URL) -> httpx2.URL:
+    """``url`` parsed, if ``Credential.request()`` may send a bearer token to
+    it; else ``DisallowedHost`` (D34).
+
+    Allowed: ``https://`` on ``*.googleapis.com``, or exactly the origin
+    (scheme, host, port) of a configured ``google_base_urls`` entry. Never a
+    URL with userinfo (``https://evil.com@sheets.googleapis.com`` goes to
+    Google, but is always a mistake or a trick).
+    """
+    try:
+        parsed = httpx2.URL(url)
+    except (httpx2.InvalidURL, TypeError):
+        raise DisallowedHost("that URL", None, "it is not a valid URL") from None
+    host = _host(parsed) or None
+    origin = f"{parsed.scheme}://{host}" if parsed.scheme and host else "that URL"
+    if host is None:
+        raise DisallowedHost(origin, None, "it has no host")
+    if parsed.userinfo:
+        raise DisallowedHost(origin, host, "it contains a username or password")
+    if _origin(parsed) in configured_origins(datasette):
+        return parsed
+    if parsed.scheme != "https":
+        raise DisallowedHost(origin, host, "only https:// is allowed")
+    if not host.endswith(GOOGLE_API_DOMAIN):
+        raise DisallowedHost(origin, host, "it is not a Google API host")
+    return parsed
 
 
 # --- Access -------------------------------------------------------------------
@@ -338,8 +390,21 @@ class Credential:
             await _touch_used(self._datasette, row.id, actor_id)
             return token.access_token
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> httpx2.Response:
+    async def request(
+        self,
+        method: str,
+        url: str | httpx2.URL,
+        *,
+        allow_any_host: bool = False,
+        **kwargs: Any,
+    ) -> httpx2.Response:
         """Make an authenticated request to a Google API.
+
+        ``url`` must be ``https://`` on a ``*.googleapis.com`` host (or on the
+        origin of a configured ``google_base_urls`` entry), with no userinfo;
+        anything else raises ``DisallowedHost`` before a token is fetched or
+        anything is sent (D34). ``allow_any_host=True`` skips that check: the
+        bearer token then goes wherever ``url`` points.
 
         ``kwargs`` go to ``httpx2.AsyncClient.request`` (``params``, ``json``,
         ``headers``, ...); any ``Authorization`` header is replaced. On a 401
@@ -348,20 +413,25 @@ class Credential:
         response is returned whatever its status. Uses this plugin's own
         client (no redirects followed), never the caller's.
         """
-        # TODO(ticket 22): restrict `url` to an allowlist of Google API hosts
-        # (needs Alex's decision); for now any URL gets the bearer token.
         headers = httpx2.Headers(kwargs.pop("headers", None))
-        with request_call(self.id, self.info.type, method, url) as call:
+        with request_call(self.id, self.info.type, method, str(url)) as call:
+            # Parsed once, by the same parser the client sends with, so the
+            # host checked is the host the token goes to.
+            target = (
+                httpx2.URL(url)
+                if allow_any_host
+                else check_request_url(self._datasette, url)
+            )
             async with client(self._datasette) as http:
                 headers["Authorization"] = f"Bearer {await self.token()}"
-                response = await http.request(method, url, headers=headers, **kwargs)
+                response = await http.request(method, target, headers=headers, **kwargs)
                 call.status = response.status_code
                 if response.status_code != 401:
                     return response
                 call.retried = True
                 get_token_cache(self._datasette).evict(self.id)
                 headers["Authorization"] = f"Bearer {await self.token()}"
-                response = await http.request(method, url, headers=headers, **kwargs)
+                response = await http.request(method, target, headers=headers, **kwargs)
                 call.status = response.status_code
                 return response
 

@@ -117,6 +117,7 @@ tests/
 ├── test_sample_importer.py  # Loads samples/ via plugins_dir; unregisters after
 ├── test_sample_exporter.py  # Same pattern; patches caps on the plugins_dir-loaded module
 ├── test_service_account.py
+├── test_security_invariants.py # Cross-cutting ticket-22 checks: secret scans, D34 allowlist, no allowed() for OAuth, ...
 ├── test_smoke.py
 ├── test_telemetry.py          # One test per span/metric
 ├── test_telemetry_registry.py # Conformance both ways + privacy walk + SDK-import check
@@ -201,6 +202,10 @@ Pages (`routes/pages.py`, rendered by `render_page()`):
   `.request()`, so a held `Credential` never outlives a revocation.
 - No secrets, tokens or key material in responses, logs, events, errors or telemetry.
 - Google URLs come only from config. Never honour a key file's `token_uri`.
+- `Credential.request()` sends the bearer token only to `https://*.googleapis.com`
+  or a configured `google_base_urls` origin, never with userinfo (D34);
+  anything else raises `DisallowedHost` before a token is fetched, unless the
+  caller passes `allow_any_host=True`.
 - The default test suite never contacts real Google; use the `mock_google`
   fixture (`tests/fixtures_google.py`). Internet sockets and DNS are blocked
   for the whole suite. Only `tests/live/` talks to Google: it overrides the

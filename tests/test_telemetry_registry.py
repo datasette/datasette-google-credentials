@@ -12,7 +12,8 @@ literal names are spelled out here too.
 The privacy walk plants sentinels (actor id, label, Google identity, a
 spreadsheet id and query value in a request URL), harvests every secret the
 mock saw or issued, and asserts none of them reaches any signal, core's
-included.
+included. It drives the broker directly and the JSON API routes and pages
+through ``datasette.client``, so core's request span is covered too.
 """
 
 import json
@@ -53,6 +54,7 @@ from datasette_google_auth.crypto import (  # noqa: E402
 from datasette_google_auth.errors import (  # noqa: E402
     CredentialBroken,
     CredentialNotFound,
+    DisallowedHost,
     GoogleTokenError,
     InvalidServiceAccountKey,
 )
@@ -82,6 +84,7 @@ SHEET_ID = "sheet-sentinel-XYZZY"
 QUERY_VALUE = "query-sentinel-XYZZY"
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
 STUDENTS = f"{SHEETS_BASE}/v4/spreadsheets/students"
+API = "/-/google-auth/api"
 
 # Form fields that carry a secret or identifier (grant_type, redirect_uri
 # and scope are public constants).
@@ -339,6 +342,51 @@ async def run_workload(datasette, mock_google, service_account_keys):
         await rotate_service_account_key(
             datasette, ACTOR, info.id, raw(service_account_keys["other"])
         )
+
+    # A URL outside the allowlist (D34), with sentinels in userinfo, path
+    # and query: refused before any token fetch, host only on the span.
+    with pytest.raises(DisallowedHost):
+        await sa.request(
+            "GET", f"https://{ACTOR_ID}@evil.example.com/{SHEET_ID}?q={QUERY_VALUE}"
+        )
+
+    # The JSON API and pages, each inside core's request span: no
+    # GoogleAuthError may escape a route and put its message there (D29).
+    for path in (
+        f"{API}/status",
+        f"{API}/credentials",
+        f"{API}/credentials?scopes={SCOPE_SHEETS}",
+        f"{API}/admin/credentials",  # 403: not an admin
+        "/-/google-auth",
+        "/-/google-auth/admin",
+    ):
+        await datasette.client.get(path, actor=ACTOR)
+    added = await datasette.client.post(
+        f"{API}/service-accounts",
+        json={"label": LABEL, "key_json": raw(service_account_keys["other"])},
+        actor=ACTOR,
+    )
+    assert added.status_code == 200
+    other_id = added.json()["id"]
+    renamed = await datasette.client.post(
+        f"{API}/credentials/{other_id}/rename", json={"label": LABEL}, actor=ACTOR
+    )
+    assert renamed.status_code == 200
+    # Its message names the stored client_email (key material to the walk).
+    wrong_key = await datasette.client.post(
+        f"{API}/credentials/{other_id}/rotate-key",
+        json={"key_json": raw(service_account_keys["test"])},
+        actor=ACTOR,
+    )
+    assert wrong_key.status_code == 400
+    unknown = await datasette.client.post(
+        f"{API}/credentials/no-such-id/delete", actor=ACTOR
+    )
+    assert unknown.status_code == 404
+    deleted = await datasette.client.post(
+        f"{API}/credentials/{other_id}/delete", actor=ACTOR
+    )
+    assert deleted.status_code == 200
 
     # Connect Google: created, reconnected, then refresh (rotated).
     assert (await flow.connect()).status_code == 302

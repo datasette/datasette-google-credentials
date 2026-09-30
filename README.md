@@ -405,6 +405,11 @@ What the plugin protects:
 - **No secret leaves the plugin.** Keys and refresh tokens never appear in an
   API response, the UI, a log line, an event, an exception message or
   telemetry. A pasted key is write-only.
+- **Tokens only go to Google.** `Credential.request()` sends the bearer
+  token only to `https://` URLs on `*.googleapis.com` (or on a configured
+  `google_base_urls` origin) with no username or password in them;
+  anything else raises `DisallowedHost` before a token is fetched. A
+  consumer can opt out per call with `allow_any_host=True`.
 - **A key file's `token_uri` is ignored.** Service-account tokens are always
   minted at `https://oauth2.googleapis.com/token`. Honouring `token_uri` would
   send a signed assertion to whatever URL a pasted file names.
@@ -446,9 +451,6 @@ What isn't protected:
 - **Installed plugins are trusted.** The Python API takes the `actor` its
   caller passes in; any plugin can pass any actor. Only install consumer
   plugins you trust.
-- **`Credential.request()` attaches the bearer token to whatever URL it is
-  given.** Consumers must only pass Google API URLs. (Restricting it to a
-  list of Google hosts is planned.)
 - **Deleting a service account doesn't delete its key at Google.** Delete it
   in the Cloud console, as above.
 - **A departing user's OAuth connections stay** until they or a
@@ -506,8 +508,13 @@ may use it for `scopes`. For a service account `scopes` must be non-empty
 - **`await cred.token()`**: a Google access token string for the requested
   scopes, from the cache or freshly minted or refreshed. Never log it or send
   it to a browser.
-- **`await cred.request(method, url, **kwargs)`**: an authenticated request
-  with this plugin's `httpx2` client (no redirects followed). `kwargs` go to
+- **`await cred.request(method, url, *, allow_any_host=False, **kwargs)`**:
+  an authenticated request with this plugin's `httpx2` client (no redirects
+  followed). `url` must be `https://` on a `*.googleapis.com` host, without
+  a username or password, or `DisallowedHost` is raised before any token is
+  fetched or anything sent, so a bug can't hand the token to a third party.
+  Pass `allow_any_host=True` only if you really mean to send a Google token
+  somewhere else. `kwargs` go to
   `httpx2.AsyncClient.request` (`params`, `json`, `headers`...); any
   `Authorization` header is replaced. On a 401 the cached token is evicted and
   the request retried once, so the body must be replayable (not a stream).
@@ -553,6 +560,7 @@ safe to show to the user.
 | `CredentialBroken` | `credential_broken` | 409 | Google rejected the key or grant (`invalid_grant`). Has `.detail`, `.reconnect_url` (OAuth, owner) |
 | `CredentialChanged` | `credential_changed` | 409 | It was reconnected or rotated while in use, twice in a row. Try again |
 | `InvalidServiceAccountKey` | `invalid_service_account_key` | 400 | A pasted key was rejected (locally or by Google's test exchange) |
+| `DisallowedHost` | `disallowed_host` | 400 | `Credential.request()` was given a URL that isn't `https://*.googleapis.com` (and `allow_any_host` wasn't set). Has `.host` |
 | `GoogleTokenError` | `google_error` | 502 | A Google token endpoint failed another way (5xx, network, bad reply). Has `.status`, `.error`, `.description` |
 | `EncryptionNotConfigured` | `encryption_not_configured` | 503 | No `encryption-key` |
 | `CredentialUndecryptable` | `credential_undecryptable` | 500 | No configured key decrypts it (was `encryption-key` changed?) |
