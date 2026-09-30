@@ -45,6 +45,7 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 | `just test` | Run Python tests (pytest, asyncio strict); never collects `tests/live/` |
 | `just test-live` | Opt-in live tests against real Google (`tests/live/SETUP.md`); Alex runs them, never CI or agents |
 | `just clean-dev` | Delete `.tmp/` (dev databases) |
+| `just shots [names]` | Rebuild the frontend and regenerate `docs/screenshots/*.png` (Playwright; throwaway seeded servers, never contacts Google) |
 | `just dev-otel` | `just dev` plus `../datasette-otel-viewer` (spans and metrics at `/-/otel`) |
 | `just telemetry-doc` / `telemetry-doc-check` | Regenerate / verify README's telemetry reference from the registry |
 | `uv run datasette google-auth generate-key` | Print a new Fernet key for `encryption-key` |
@@ -92,6 +93,9 @@ frontend/
     └── pages/{index,admin}/ # index.ts mounts <Name>Page.svelte into #app-root
 scripts/typegen-pagedata.py  # page_data.__exports__ → JSON Schema
 scripts/telemetry-doc.py     # Renders README's telemetry reference from telemetry_registry
+scripts/shots_seed.py        # Dev-only seed plugin for `just shots` (demo rows straight into internal DB, header actor)
+frontend/scripts/screenshots.mjs  # `just shots` runner; one file per shot in frontend/scripts/shots/defs/
+docs/screenshots/             # Committed README screenshots
 samples/                     # Consumer sample plugins: public API only (importer, exporter)
 ├── google_sheets_import.py  # One-shot sheet → table import at /-/google-sheets-import/<db>
 └── google_sheets_export.py  # Table / query → new or existing sheet at /-/google-sheets-export (RAW, capped, chunked)

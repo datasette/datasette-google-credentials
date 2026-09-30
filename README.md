@@ -177,6 +177,8 @@ rotate, share and delete service accounts, and delete credentials. The
 Datasette menu links to it as "Google accounts" for signed-in actors who hold
 any of the three global actions (see [Permissions](#permissions)).
 
+![The management page: two connected Google accounts, one broken with a Reconnect button, and two service accounts, one shared with you as User](docs/screenshots/index.png)
+
 - **Anonymous visitors get 403.** Any signed-in actor gets the page, even
   without a google-auth action: a service account may have been shared with
   them, and the page is where they find its `client_email` to share sheets
@@ -189,6 +191,8 @@ any of the three global actions (see [Permissions](#permissions)).
   snippets, and the exact redirect URI to register) is shown only to
   `google-auth-admin` actors, which includes root under `--root`; everyone
   else sees a short notice to ask an admin.
+
+![Setup notices on an unconfigured Datasette: no encryption key, no OAuth client (with the redirect URI to register), no persistent internal database](docs/screenshots/setup-notices.png)
 
 ## Google Cloud setup for "Connect Google"
 
@@ -313,6 +317,10 @@ two spellings as the same scope (see [Scopes](#scopes)).
 5. **Share the credential with people** through the share dialog, as User,
    Editor or Manager (see [Permissions](#permissions)). You are its Manager.
 
+![The Add a service account dialog, showing the pasted key's client_email](docs/screenshots/add-service-account.png)
+
+![The share dialog for a service account: its Manager, an Editor and a User](docs/screenshots/share-dialog.png)
+
 **Rotating a service-account key.** Create a new key in the Cloud console,
 then use "Rotate key" on the credential (needs Editor) and paste it. The new
 key is tested with Google before it replaces the old one. Then delete the old
@@ -425,6 +433,8 @@ its owner and last use (the "All Google credentials" page at
 revokes an OAuth grant at Google. It **cannot**
 use, rename or rotate someone else's credential, share a service account, or
 see any secret. It is meant for offboarding and incidents.
+
+![All Google credentials: every credential with its owner, status, access and last use, and a Delete button](docs/screenshots/admin.png)
 
 What isn't protected:
 
@@ -713,6 +723,10 @@ in `../` (see `[tool.uv.sources]` in `pyproject.toml`). `just dev` serves on
 port 8021 with `--internal .tmp/internal.db`, grants every google-auth action
 to everyone and loads `samples/`. The test suite never contacts Google: it
 runs against an in-process mock (`tests/mock_google/`).
+
+`just shots` regenerates the screenshots in `docs/screenshots/` with
+Playwright, against throwaway servers seeded with demo data (no Google
+calls). It needs Chromium once: `npx --prefix frontend playwright install chromium`.
 
 ## Telemetry
 

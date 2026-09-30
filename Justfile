@@ -20,6 +20,15 @@ frontend-format:
 frontend-format-check:
   npm run format:check --prefix frontend
 
+# Documentation screenshots (docs/screenshots/*.png, committed): boots
+# throwaway datasettes seeded by the dev-only scripts/shots_seed.py, shoots,
+# tears down. Nothing contacts Google. Builds the frontend first so shots
+# reflect current code. Pass shot names for a subset, e.g. `just shots index`.
+# Needs Chromium once: `npx --prefix frontend playwright install chromium`.
+shots *names:
+  just frontend
+  node frontend/scripts/screenshots.mjs {{names}}
+
 # === Type Generation ===
 # Generated types are committed. Every recipe ends by running prettier over
 # what it wrote (from inside frontend/, so prettier finds its plugins), so
