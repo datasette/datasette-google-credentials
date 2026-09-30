@@ -29,10 +29,14 @@ from datasette_plugin_router import Body
 from pydantic import BaseModel, ConfigDict, SecretStr
 
 from ..admin import list_all_credentials
-from ..broker import list_credentials
 from ..config import encryption_configured, get_config, oauth_configured
 from ..errors import GoogleAuthError, error_response
-from ..models import AdminCredentialInfo, CredentialInfo, DeleteResult
+from ..models import (
+    AdminCredentialInfo,
+    CredentialInfo,
+    DeleteResult,
+    ListedCredential,
+)
 from ..oauth import redirect_uri
 from ..permissions import can_add_service_account, can_admin, can_connect
 from ..router import router
@@ -40,6 +44,7 @@ from ..service import (
     add_service_account,
     clean_label,
     delete,
+    list_with_access,
     rename,
     rotate_service_account_key,
 )
@@ -50,7 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 class CredentialListResponse(BaseModel):
-    credentials: list[CredentialInfo]
+    credentials: list[ListedCredential]
 
 
 class AdminCredentialListResponse(BaseModel):
@@ -172,8 +177,8 @@ async def api_status(datasette, request):
 async def api_credentials(datasette, request):
     # Anonymous actors get an empty list, not an error (as list_credentials).
     try:
-        credentials = await list_credentials(
-            datasette, actor=request.actor, scopes=_scopes_arg(request)
+        credentials = await list_with_access(
+            datasette, request.actor, _scopes_arg(request)
         )
     except GoogleAuthError as ex:
         return error_response(ex)

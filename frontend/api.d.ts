@@ -78,7 +78,7 @@ export interface paths {
           content: {
             "application/json": {
               /** Credentials */
-              credentials: components["schemas"]["CredentialInfo"][];
+              credentials: components["schemas"]["ListedCredential"][];
             };
           };
         };
@@ -500,10 +500,13 @@ export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
     /**
-     * CredentialInfo
-     * @description One credential as an actor sees it. Never contains secrets.
+     * ListedCredential
+     * @description ``CredentialInfo`` plus what the management page (ticket 14) needs to
+     *     decide which controls to show. Returned by ``GET /api/credentials``; the
+     *     extra fields are additive, so each item still reads as a
+     *     ``CredentialInfo``. Never a secret, nor who else used or can use it.
      */
-    CredentialInfo: {
+    ListedCredential: {
       /** Id */
       id: string;
       /** Type */
@@ -520,6 +523,16 @@ export interface components {
       status_detail: string | null;
       /** Is Owner */
       is_owner: boolean;
+      /** Role */
+      role: ("User" | "Editor" | "Manager") | null;
+      /** Can Edit */
+      can_edit: boolean;
+      /** Can Manage */
+      can_manage: boolean;
+      /** Last Used At */
+      last_used_at: string | null;
+      /** Missing Scopes */
+      missing_scopes: string[];
     };
     /**
      * AdminCredentialInfo

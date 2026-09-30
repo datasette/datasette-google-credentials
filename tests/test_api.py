@@ -20,6 +20,7 @@ from datasette_google_auth.models import (
     AdminCredentialInfo,
     CredentialInfo,
     DeleteResult,
+    ListedCredential,
 )
 from datasette_google_auth.permissions import (
     ADD_SERVICE_ACCOUNT,
@@ -166,7 +167,8 @@ def test_openapi_documents_every_endpoint():
     # key_json is write-only in the schema, so generated types mark it so.
     add = bodies["/-/google-auth/api/service-accounts"]["properties"]["key_json"]
     assert add["writeOnly"] is True
-    assert {"AdminCredentialInfo", "CredentialInfo"} <= set(
+    # List items are ListedCredential (CredentialInfo plus page fields).
+    assert {"AdminCredentialInfo", "ListedCredential"} <= set(
         doc["components"]["schemas"]
     )
 
@@ -260,7 +262,9 @@ async def test_credentials_lists_own_and_shared(mock_google, service_account_key
     alice = (await get(datasette, "/credentials", actor=ALICE)).json()
     assert [c["id"] for c in alice["credentials"]] == [alice_oauth.id, sa.id]
     for credential in alice["credentials"]:
-        assert set(credential) == set(CredentialInfo.model_fields)
+        # CredentialInfo plus the page's additive fields, and nothing else.
+        assert set(credential) == set(ListedCredential.model_fields)
+        assert set(CredentialInfo.model_fields) < set(credential)
 
     bob = (await get(datasette, "/credentials", actor=BOB)).json()
     assert [c["id"] for c in bob["credentials"]] == [bob_oauth.id]
@@ -899,7 +903,7 @@ def _raiser(exc):
     "target,method,path,body",
     [
         ("get_status", "get", "/status", None),
-        ("list_credentials", "get", "/credentials", None),
+        ("list_with_access", "get", "/credentials", None),
         ("list_all_credentials", "get", "/admin/credentials", None),
         ("add_service_account", "post", "/service-accounts", {"key_json": "{}"}),
         ("rename", "post", "/credentials/x/rename", {"label": "y"}),

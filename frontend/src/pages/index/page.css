@@ -1,0 +1,129 @@
+/* Shared by the management page's section components (scoped under the
+   page root so nothing leaks into Datasette's own chrome). */
+
+.google-auth-page {
+  max-width: 56rem;
+}
+
+.google-auth-page section {
+  margin: 1.5rem 0 2rem;
+}
+
+.google-auth-page .heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.google-auth-page .heading h2 {
+  margin: 0;
+}
+
+.google-auth-page .button,
+.google-auth-page .actions button {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid #888;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.google-auth-page .heading .button {
+  background: #1a73e8;
+  border-color: #1a73e8;
+  color: #fff;
+}
+
+.google-auth-page .cards {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.google-auth-page .card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.google-auth-page .title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.google-auth-page .email {
+  color: #555;
+}
+
+.google-auth-page .badge {
+  font-size: 0.75rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: #eef;
+  color: #334;
+}
+
+.google-auth-page .badge-broken {
+  background: #fde2e1;
+  color: #8a1c14;
+}
+
+.google-auth-page .badge-limited {
+  background: #fff1c2;
+  color: #6b4b00;
+}
+
+.google-auth-page .problem {
+  color: #8a1c14;
+  margin: 0.4rem 0;
+}
+
+.google-auth-page dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.google-auth-page dt {
+  color: #666;
+}
+
+.google-auth-page dd {
+  margin: 0;
+}
+
+.google-auth-page .actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.google-auth-page .empty,
+.google-auth-page .small {
+  color: #666;
+}
+
+.google-auth-page .small {
+  font-size: 0.85rem;
+}
+
+.google-auth-page .dismiss {
+  float: right;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+}

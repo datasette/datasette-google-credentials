@@ -30,6 +30,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
+from .broker import list_credentials, missing_scopes
+from .config import REQUIRED_SCOPES, get_config
 from .crypto import decrypt_credential
 from .errors import (
     CredentialForbidden,
@@ -40,9 +42,18 @@ from .errors import (
 )
 from .events import CredentialDeletedEvent, mark_broken, track_credential_event
 from .internal_db import CredentialRow, InternalDB
-from .models import CredentialInfo, DeleteResult
+from .models import CredentialInfo, DeleteResult, ListedCredential
 from .oauth import DEFAULT_RETURN_TO, connect_url, revoke_token
-from .permissions import can_admin, can_edit_sa, can_manage_sa, can_use_sa
+from .permissions import (
+    SA_EDIT,
+    SA_MANAGE,
+    can_admin,
+    can_edit_sa,
+    can_manage_sa,
+    can_use_sa,
+    sa_access,
+    sa_role,
+)
 from .service_account import add_service_account, rotate_service_account_key
 from .token_cache import get_token_cache
 
@@ -54,6 +65,7 @@ __all__ = [
     "add_service_account",
     "cloud_console_url",
     "delete",
+    "list_with_access",
     "mark_broken",
     "reconnect_url",
     "rename",
@@ -116,6 +128,61 @@ def cloud_console_url(project_id: str) -> str:
     """The Cloud console's service-accounts page for a project (UNVERIFIED
     format, see ``CLOUD_CONSOLE_SERVICE_ACCOUNTS``)."""
     return CLOUD_CONSOLE_SERVICE_ACCOUNTS + "?" + urlencode({"project": project_id})
+
+
+# --- List ---------------------------------------------------------------------
+
+
+async def list_with_access(
+    datasette: Datasette, actor: Actor, scopes: list[str] | None = None
+) -> list[ListedCredential]:
+    """``list_credentials()``, each item with the actor's role, what they may
+    change, when it was last used and (OAuth) which configured scopes it
+    lacks. For ``GET /api/credentials`` and the management page.
+
+    Visibility is exactly ``list_credentials()``'s; this only re-reads those
+    rows (the broker's ``CredentialInfo`` has no ``last_used_at``) and adds
+    one ``allowed_many()`` per service account. A row deleted in between is
+    dropped.
+    """
+    infos = await list_credentials(datasette, actor=actor, scopes=scopes)
+    idb = InternalDB(datasette.get_internal_database())
+    rows = {row.id: row for row in await idb.list_by_ids([i.id for i in infos])}
+    configured = [
+        scope for scope in get_config(datasette).scopes if scope not in REQUIRED_SCOPES
+    ]
+    listed = []
+    for info in infos:
+        row = rows.get(info.id)
+        if row is None:
+            continue
+        # From the re-read row, so every field describes the same moment.
+        base = CredentialInfo.from_row(row, actor).model_dump()
+        if row.type == OAUTH:
+            # list_credentials only lists the actor's own OAuth credentials.
+            listed.append(
+                ListedCredential(
+                    **base,
+                    role=None,
+                    can_edit=info.is_owner,
+                    can_manage=info.is_owner,
+                    last_used_at=row.last_used_at,
+                    missing_scopes=missing_scopes(configured, row.scopes),
+                )
+            )
+        else:
+            access = await sa_access(datasette, actor, row)
+            listed.append(
+                ListedCredential(
+                    **base,
+                    role=sa_role(access),
+                    can_edit=access[SA_EDIT],
+                    can_manage=access[SA_MANAGE],
+                    last_used_at=row.last_used_at,
+                    missing_scopes=[],
+                )
+            )
+    return listed
 
 
 # --- Rename -------------------------------------------------------------------

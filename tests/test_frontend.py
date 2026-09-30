@@ -64,14 +64,11 @@ async def test_index_page_renders_vite_entry_and_page_data(mock_google, actor):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("actor", [None, {"id": "nobody"}])
-async def test_index_page_forbidden_without_any_google_auth_permission(
-    mock_google, actor
-):
+async def test_index_page_forbidden_for_anonymous(mock_google):
+    # Signed-in actors without a google-auth action get the page (ticket 14,
+    # tests/test_pages.py): shared service accounts are listed there.
     datasette = await make_datasette(mock_google)
-    response = await datasette.client.get(
-        "/-/google-auth", cookies=cookies(datasette, actor) if actor else {}
-    )
+    response = await datasette.client.get("/-/google-auth")
     assert response.status_code == 403
     assert 'id="pageData"' not in response.text
 

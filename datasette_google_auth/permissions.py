@@ -36,6 +36,7 @@ from datasette_acl.grants import grant as _acl_grant
 from datasette_acl.roles import AclRole, standard_roles
 
 from .internal_db import TABLE, CredentialRow
+from .models import SaRole
 
 # --- Names ------------------------------------------------------------------
 
@@ -202,6 +203,31 @@ async def can_manage_sa(datasette, actor, row: CredentialRow) -> bool:
     return await _sa_allowed(datasette, SA_MANAGE, actor, row)
 
 
+async def sa_access(datasette, actor, row: CredentialRow) -> dict[str, bool]:
+    """``{SA_USE: …, SA_EDIT: …, SA_MANAGE: …}`` for one service account, in
+    one ``allowed_many()`` query (edit and manage already fold in use via
+    ``also_requires``). All False for any other type, without a check."""
+    names = (SA_USE, SA_EDIT, SA_MANAGE)
+    if row.type != "service_account":
+        return dict.fromkeys(names, False)
+    return await datasette.allowed_many(
+        actions=list(names), resource=ServiceAccountResource(row.id), actor=actor
+    )
+
+
+def sa_role(access: dict[str, bool]) -> SaRole | None:
+    """The acl role name matching ``sa_access()``'s verdicts, for display.
+    Permissions granted outside acl needn't nest, so gate controls on the
+    verdicts themselves, not on this."""
+    if access.get(SA_MANAGE):
+        return "Manager"
+    if access.get(SA_EDIT):
+        return "Editor"
+    if access.get(SA_USE):
+        return "User"
+    return None
+
+
 async def can_connect(datasette, actor) -> bool:
     return await datasette.allowed(action=CONNECT, actor=actor)
 
@@ -212,6 +238,18 @@ async def can_add_service_account(datasette, actor) -> bool:
 
 async def can_admin(datasette, actor) -> bool:
     return await datasette.allowed(action=ADMIN, actor=actor)
+
+
+async def has_any_global_action(datasette, actor) -> bool:
+    """Does a signed-in actor hold any of the three global actions? Decides
+    the "Google accounts" menu link. Anonymous actors never do, even when
+    config allows an action to everyone: the page 403s them."""
+    if not actor or actor.get("id") is None:
+        return False
+    verdicts = await datasette.allowed_many(
+        actions=[CONNECT, ADD_SERVICE_ACCOUNT, ADMIN], actor=actor
+    )
+    return any(verdicts.values())
 
 
 # --- Listing ----------------------------------------------------------------

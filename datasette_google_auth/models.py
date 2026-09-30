@@ -7,11 +7,13 @@ anything derived from it.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
 from .internal_db import CredentialRow
+
+SaRole = Literal["User", "Editor", "Manager"]
 
 
 class CredentialInfo(BaseModel):
@@ -43,6 +45,24 @@ class CredentialInfo(BaseModel):
             status_detail=row.status_detail,
             is_owner=actor_id is not None and str(actor_id) == row.owner_id,
         )
+
+
+class ListedCredential(CredentialInfo):
+    """``CredentialInfo`` plus what the management page (ticket 14) needs to
+    decide which controls to show. Returned by ``GET /api/credentials``; the
+    extra fields are additive, so each item still reads as a
+    ``CredentialInfo``. Never a secret, nor who else used or can use it."""
+
+    role: SaRole | None
+    """The actor's acl role on a service account; None for OAuth."""
+    can_edit: bool
+    """May rename it (and rotate the key, for a service account)."""
+    can_manage: bool
+    """May delete it (and share it, for a service account)."""
+    last_used_at: str | None
+    missing_scopes: list[str]
+    """OAuth: configured scopes this connection wasn't granted ("limited
+    access", fixed by reconnecting). Always empty for service accounts."""
 
 
 class AdminCredentialInfo(CredentialInfo):

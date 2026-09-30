@@ -70,7 +70,8 @@ datasette_google_auth/
 ├── oauth.py                 # Connect Google: PKCE + signed state flow, code exchange, refresh
 ├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
 ├── router.py                # Shared Router; every view's request body capped at 16 KB (JSON 413)
-├── service.py               # Lifecycle for routes: rename / rotate / reconnect_url / delete (+ revoke)
+├── service.py               # Lifecycle for routes: list_with_access / rename / rotate / reconnect_url / delete (+ revoke)
+├── sharing.py               # datasette-acl-share dialog assets (management page only; None if unbuilt)
 ├── service_account.py       # parse_key (ignores token_uri), mint_token, add / rotate SA keys
 ├── telemetry.py             # OTel tracer/meter (API only): google_call, token/request/callback spans
 ├── telemetry_registry.py    # Every span, metric and attribute name (D29); drives the README reference
@@ -106,6 +107,7 @@ tests/
 ├── test_frontend.py         # Page template + Vite entry (datasette-vite dev mode) + #pageData
 ├── test_internal_db.py
 ├── test_lifecycle.py
+├── test_pages.py            # Management page: gate, page data, notices, menu link, share assets
 ├── test_permissions.py
 ├── test_sample_importer.py  # Loads samples/ via plugins_dir; unregisters after
 ├── test_sample_exporter.py  # Same pattern; patches caps on the plugins_dir-loaded module
@@ -142,7 +144,8 @@ JSON API (`routes/api.py`). Errors are `error_response()` JSON
 (`{ok: false, error, code, ...}`); ids the actor may not know about are 404.
 POSTs need no CSRF token (Datasette checks `Sec-Fetch-Site`/`Origin`).
 - `GET /-/google-auth/api/status` → setup-notice flags + permissions (any actor)
-- `GET /-/google-auth/api/credentials?scopes=a,b` → `{credentials: CredentialInfo[]}`, mirrors `list_credentials()`
+- `GET /-/google-auth/api/credentials?scopes=a,b` → `{credentials: ListedCredential[]}`, mirrors `list_credentials()`;
+  each item is a `CredentialInfo` plus the page's `role`, `can_edit`, `can_manage`, `last_used_at`, `missing_scopes`
 - `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` → `{credentials: AdminCredentialInfo[]}` (`google-auth-admin`, info only)
 - `POST /-/google-auth/api/service-accounts` `{label?, key_json}` → CredentialInfo + `share_with_email`
 - `POST /-/google-auth/api/credentials/{id}/rename` `{label}` → CredentialInfo
@@ -150,11 +153,16 @@ POSTs need no CSRF token (Datasette checks `Sec-Fetch-Site`/`Origin`).
 - `POST /-/google-auth/api/credentials/{id}/delete` → DeleteResult
 
 Pages (`routes/pages.py`, rendered by `render_page()`):
-- `GET /-/google-auth` → management page (placeholder until ticket 14; 403 without any google-auth action)
+- `GET /-/google-auth` → management page (403 for anonymous; any signed-in actor, who may have
+  shared service accounts). Svelte app in `frontend/src/pages/index/`; dialogs use `lib/Modal.svelte`
+  (core `DatasetteModal`). Connect/Reconnect link to `/-/google-auth/connect?return_to=/-/google-auth`;
+  the callback reports back through Datasette flash messages.
 
 ## Hooks Used
 
 - `register_routes()` — registers all routes from the shared router
+- `menu_links()` — "Google accounts" for signed-in actors holding any global google-auth action (`allowed_many`)
+- `extra_js_urls()` / `extra_css_urls()` — the `<datasette-acl-share-dialog>` bundle, on the management page only
 - `extra_template_vars()` — `datasette_google_auth_vite_entry` (datasette-vite)
 - `register_actions()` — three global actions (`google-auth-connect`,
   `google-auth-add-service-account`, `google-auth-admin`) and three per-SA

@@ -12,12 +12,33 @@ export type RedirectUri = string;
 export type CanConnect = boolean;
 export type CanAddServiceAccount = boolean;
 export type IsAdmin = boolean;
+export type Id = string;
+export type Type = string;
+export type Label = string;
+export type GoogleEmail = string | null;
+export type Scopes = string[];
+export type Status = string;
+export type StatusDetail = string | null;
+export type IsOwner = boolean;
+export type Role = ("User" | "Editor" | "Manager") | null;
+export type CanEdit = boolean;
+export type CanManage = boolean;
+export type LastUsedAt = string | null;
+export type MissingScopes = string[];
+export type Credentials = ListedCredential[];
+export type ActorId = string;
+export type ConnectUrl = string;
+export type Features = string;
 
 /**
- * The ``/-/google-auth`` page (placeholder until ticket 14).
+ * The ``/-/google-auth`` management page (ticket 14).
  */
 export interface IndexPageData {
   status: StatusResponse;
+  credentials: Credentials;
+  actor_id: ActorId;
+  connect_url: ConnectUrl;
+  share: ShareDialog | null;
   [k: string]: unknown;
 }
 /**
@@ -31,5 +52,34 @@ export interface StatusResponse {
   can_connect: CanConnect;
   can_add_service_account: CanAddServiceAccount;
   is_admin: IsAdmin;
+  [k: string]: unknown;
+}
+/**
+ * ``CredentialInfo`` plus what the management page (ticket 14) needs to
+ * decide which controls to show. Returned by ``GET /api/credentials``; the
+ * extra fields are additive, so each item still reads as a
+ * ``CredentialInfo``. Never a secret, nor who else used or can use it.
+ */
+export interface ListedCredential {
+  id: Id;
+  type: Type;
+  label: Label;
+  google_email: GoogleEmail;
+  scopes: Scopes;
+  status: Status;
+  status_detail: StatusDetail;
+  is_owner: IsOwner;
+  role: Role;
+  can_edit: CanEdit;
+  can_manage: CanManage;
+  last_used_at: LastUsedAt;
+  missing_scopes: MissingScopes;
+  [k: string]: unknown;
+}
+/**
+ * Settings for ``<datasette-acl-share-dialog>`` on service accounts.
+ */
+export interface ShareDialog {
+  features: Features;
   [k: string]: unknown;
 }

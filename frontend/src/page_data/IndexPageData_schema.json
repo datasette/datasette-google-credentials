@@ -1,5 +1,126 @@
 {
   "$defs": {
+    "ListedCredential": {
+      "description": "``CredentialInfo`` plus what the management page (ticket 14) needs to\ndecide which controls to show. Returned by ``GET /api/credentials``; the\nextra fields are additive, so each item still reads as a\n``CredentialInfo``. Never a secret, nor who else used or can use it.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "google_email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Google Email"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "status_detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Status Detail"
+        },
+        "is_owner": {
+          "title": "Is Owner",
+          "type": "boolean"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "enum": ["User", "Editor", "Manager"],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Role"
+        },
+        "can_edit": {
+          "title": "Can Edit",
+          "type": "boolean"
+        },
+        "can_manage": {
+          "title": "Can Manage",
+          "type": "boolean"
+        },
+        "last_used_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Used At"
+        },
+        "missing_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Scopes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "label",
+        "google_email",
+        "scopes",
+        "status",
+        "status_detail",
+        "is_owner",
+        "role",
+        "can_edit",
+        "can_manage",
+        "last_used_at",
+        "missing_scopes"
+      ],
+      "title": "ListedCredential",
+      "type": "object"
+    },
+    "ShareDialog": {
+      "description": "Settings for ``<datasette-acl-share-dialog>`` on service accounts.",
+      "properties": {
+        "features": {
+          "title": "Features",
+          "type": "string"
+        }
+      },
+      "required": ["features"],
+      "title": "ShareDialog",
+      "type": "object"
+    },
     "StatusResponse": {
       "description": "What the management page needs for its setup notices (ticket 14).",
       "properties": {
@@ -45,13 +166,38 @@
       "type": "object"
     }
   },
-  "description": "The ``/-/google-auth`` page (placeholder until ticket 14).",
+  "description": "The ``/-/google-auth`` management page (ticket 14).",
   "properties": {
     "status": {
       "$ref": "#/$defs/StatusResponse"
+    },
+    "credentials": {
+      "items": {
+        "$ref": "#/$defs/ListedCredential"
+      },
+      "title": "Credentials",
+      "type": "array"
+    },
+    "actor_id": {
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "connect_url": {
+      "title": "Connect Url",
+      "type": "string"
+    },
+    "share": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShareDialog"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
-  "required": ["status"],
+  "required": ["status", "credentials", "actor_id", "connect_url", "share"],
   "title": "IndexPageData",
   "type": "object"
 }
