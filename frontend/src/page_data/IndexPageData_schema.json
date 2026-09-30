@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "StatusResponse": {
+      "description": "What the management page needs for its setup notices (ticket 14).",
+      "properties": {
+        "encryption_configured": {
+          "title": "Encryption Configured",
+          "type": "boolean"
+        },
+        "oauth_configured": {
+          "title": "Oauth Configured",
+          "type": "boolean"
+        },
+        "internal_db_persistent": {
+          "title": "Internal Db Persistent",
+          "type": "boolean"
+        },
+        "redirect_uri": {
+          "title": "Redirect Uri",
+          "type": "string"
+        },
+        "can_connect": {
+          "title": "Can Connect",
+          "type": "boolean"
+        },
+        "can_add_service_account": {
+          "title": "Can Add Service Account",
+          "type": "boolean"
+        },
+        "is_admin": {
+          "title": "Is Admin",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "encryption_configured",
+        "oauth_configured",
+        "internal_db_persistent",
+        "redirect_uri",
+        "can_connect",
+        "can_add_service_account",
+        "is_admin"
+      ],
+      "title": "StatusResponse",
+      "type": "object"
+    }
+  },
+  "description": "The ``/-/google-auth`` page (placeholder until ticket 14).",
+  "properties": {
+    "status": {
+      "$ref": "#/$defs/StatusResponse"
+    }
+  },
+  "required": ["status"],
+  "title": "IndexPageData",
+  "type": "object"
+}

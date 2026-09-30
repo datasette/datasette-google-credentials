@@ -21,7 +21,7 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
   httpx2 (token exchange, refresh, `cred.request()`). No google-auth, no requests.
 - **Permissions:** datasette-acl is a hard dependency; datasette-acl-share provides
   the share dialog for service accounts
-- **Frontend:** Svelte 5 (runes), TypeScript, Vite, openapi-fetch (arrives in ticket 13)
+- **Frontend:** Svelte 5 (runes), TypeScript, Vite 7, openapi-fetch, served via datasette-vite
 - **Database:** sqlite-migrate for internal.db schema management (ticket 03)
 - **Build:** Just (Justfile), uv (Python), npm (frontend)
 
@@ -35,12 +35,13 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 |---------|-------------|
 | `just dev` | Datasette dev server on port 8021, loads `samples/` via `--plugins-dir` |
 | `just dev-with-hmr` | Datasette + Vite HMR (restarts on .py/.html changes) |
-| `just frontend-dev` | Vite dev server on port 5182 (stub until ticket 13) |
-| `just frontend` | Build frontend for production (stub until ticket 13) |
-| `just openapi` | Print the JSON API's OpenAPI document (input to `api.d.ts` from ticket 13) |
-| `just types` | Regenerate TypeScript types from Python (stub until ticket 13) |
-| `just format` | ruff fix + format |
-| `just check` | ty + ruff lint + ruff format check |
+| `just frontend-dev` | Vite dev server on port 5187 (5182/5186 belong to datasette-sidebar/-otel-viewer) |
+| `just frontend` | Build frontend into the package (`manifest.json`, `static/gen/`; gitignored) |
+| `just openapi` | Print the JSON API's OpenAPI document (input to `frontend/api.d.ts`) |
+| `just types` | Regenerate `frontend/api.d.ts` (`types-routes`) and page-data types (`types-pagedata`); both committed |
+| `just types-check-fresh` | Regenerate types and fail if they differ from git |
+| `just format` | ruff fix + format, prettier (frontend) |
+| `just check` | ty + ruff lint + ruff format check + svelte-check |
 | `just test` | Run Python tests (pytest, asyncio strict) |
 | `just clean-dev` | Delete `.tmp/` (dev databases) |
 | `uv run datasette google-auth generate-key` | Print a new Fernet key for `encryption-key` |
@@ -61,6 +62,7 @@ datasette_google_auth/
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
+├── page_data.py             # Pydantic #pageData models (`__exports__` → `just types-pagedata`)
 ├── models.py                # CredentialInfo, AdminCredentialInfo, DeleteResult: secret-free public views
 ├── oauth.py                 # Connect Google: PKCE + signed state flow, code exchange, refresh
 ├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
@@ -72,6 +74,16 @@ datasette_google_auth/
 └── routes/
     ├── pages.py             # Page routes (render HTML) + OAuth connect/callback redirects
     └── api.py               # JSON API (Pydantic in/out, OpenAPI); every GoogleAuthError → error_response
+└── templates/google_auth_base.html  # The one page template: Vite entry + #pageData + #app-root
+frontend/
+├── api.d.ts                 # Generated from the OpenAPI document (committed)
+├── vite.config.ts           # Entries: index, admin; builds into datasette_google_auth/
+└── src/
+    ├── lib/api.ts           # Typed openapi-fetch `client` + `api()` result normalizer
+    ├── lib/datasette-modal.d.ts  # Types for core's global DatasetteModal (use it for dialogs)
+    ├── page_data/           # load.ts + generated <Model>_schema.json / .types.ts (committed)
+    └── pages/{index,admin}/ # index.ts mounts <Name>Page.svelte into #app-root
+scripts/typegen-pagedata.py  # page_data.__exports__ → JSON Schema
 samples/                     # Consumer sample plugins: public API only (importer, exporter)
 └── google_sheets_import.py  # One-shot sheet → table import at /-/google-sheets-import/<db>
 tests/
@@ -84,6 +96,7 @@ tests/
 ├── test_oauth.py
 ├── test_config.py
 ├── test_crypto.py
+├── test_frontend.py         # Page template + Vite entry (datasette-vite dev mode) + #pageData
 ├── test_internal_db.py
 ├── test_lifecycle.py
 ├── test_permissions.py
@@ -93,9 +106,6 @@ tests/
 └── test_token_cache.py
 ```
 
-Planned per the house layout (D18): `page_data.py`,
-`templates/google_auth_base.html`, `frontend/`,
-`scripts/typegen-pagedata.py`. Update this file as they land.
 
 ## Routes
 
@@ -120,12 +130,13 @@ POSTs need no CSRF token (Datasette checks `Sec-Fetch-Site`/`Origin`).
 - `POST /-/google-auth/api/credentials/{id}/rotate-key` `{key_json}` → CredentialInfo
 - `POST /-/google-auth/api/credentials/{id}/delete` → DeleteResult
 
-Planned (D13):
-- `GET /-/google-auth` → management page
+Pages (`routes/pages.py`, rendered by `render_page()`):
+- `GET /-/google-auth` → management page (placeholder until ticket 14; 403 without any google-auth action)
 
 ## Hooks Used
 
 - `register_routes()` — registers all routes from the shared router
+- `extra_template_vars()` — `datasette_google_auth_vite_entry` (datasette-vite)
 - `register_actions()` — three global actions (`google-auth-connect`,
   `google-auth-add-service-account`, `google-auth-admin`) and three per-SA
   actions (`google-service-account-use` / `-edit` / `-manage`)

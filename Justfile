@@ -1,35 +1,67 @@
-# Ports: Datasette 8021, Vite 5182 (unused by sibling plugins).
+# Ports: Datasette 8021, Vite 5187 (unused by sibling plugins; 5182 is
+# datasette-sidebar's, 5186 datasette-otel-viewer's).
 
 # === Frontend ===
-# Stubs until ticket 13 adds frontend/ (Svelte 5 + Vite).
+# Svelte 5 + Vite, built into the package (manifest.json + static/gen/,
+# both gitignored). Run `npm install --prefix frontend` once.
 
 frontend *flags:
-  @echo "frontend/ does not exist yet (ticket 13)"
+  npm run build --prefix frontend {{flags}}
 
 frontend-dev *flags:
-  @echo "frontend/ does not exist yet (ticket 13)"
+  npm run dev --prefix frontend -- --port 5187 {{flags}}
+
+frontend-check:
+  npm run check --prefix frontend
+
+frontend-format:
+  npm run format --prefix frontend
+
+frontend-format-check:
+  npm run format:check --prefix frontend
 
 # === Type Generation ===
-# `types` is a stub until ticket 13 adds page_data.py, the typegen script and
-# frontend/. Ticket 13 then adds datasette-cron's `types-routes`:
-#   just openapi | npx --prefix frontend openapi-typescript > frontend/api.d.ts
+# Generated types are committed. Every recipe ends by running prettier over
+# what it wrote (from inside frontend/, so prettier finds its plugins), so
+# `types-check-fresh` and `frontend-format-check` agree (as in datasette-cron).
 
 # Print the JSON API's OpenAPI document (from the router's Pydantic models).
 # Importing the router imports the package, which registers every route.
 openapi:
   @uv run python -c 'from datasette_google_auth.router import router; import json; print(json.dumps(router.openapi_document_json(), indent=2))'
 
+types-routes:
+  just openapi | npx --prefix frontend openapi-typescript > frontend/api.d.ts
+  cd frontend && npx prettier --write --log-level warn api.d.ts
+
+types-pagedata:
+  uv run scripts/typegen-pagedata.py
+  for f in frontend/src/page_data/*_schema.json; do npx --prefix frontend json2ts "$f" > "${f%_schema.json}.types.ts"; done
+  cd frontend && npx prettier --write --log-level warn src/page_data/
+
 types:
-  @echo "type generation arrives with the frontend (ticket 13); see 'just openapi'"
+  just types-routes
+  just types-pagedata
+
+types-watch:
+  watchexec -e py --clear -- just types
+
+# Regenerate the types and fail if they differ from what's committed
+# ("forgot to run `just types`").
+types-check-fresh:
+  just types
+  git diff --exit-code -- frontend/api.d.ts frontend/src/page_data/
 
 # === Formatting ===
 
 format:
   uv run ruff check --fix --quiet
   uv run ruff format
+  just frontend-format
 
 format-check:
   uv run ruff format --check
+  just frontend-format-check
 
 # === Type Checking + Lint ===
 
@@ -37,6 +69,7 @@ check:
   uv run ty check
   uv run ruff check
   uv run ruff format --check
+  just frontend-check
 
 # === Testing ===
 
@@ -60,7 +93,7 @@ dev *flags:
 
 dev-with-hmr *flags:
   watchexec --stop-signal SIGKILL -e py,html --ignore '*.db' --restart --clear -- \
-    just dev -s plugins.datasette-vite.dev_ports.datasette_google_auth 5182 {{flags}}
+    just dev -s plugins.datasette-vite.dev_ports.datasette_google_auth 5187 {{flags}}
 
 clean-dev:
   rm -rf .tmp/

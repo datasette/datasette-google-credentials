@@ -6,6 +6,7 @@ the implementation lives in ``broker.py`` and ``errors.py``.
 
 from datasette import hookimpl
 from datasette.utils import StartupError
+from datasette_vite import vite_entry
 from sqlite_utils import Database as SqliteUtilsDatabase
 
 from .broker import Credential, get_credential, list_credentials
@@ -60,6 +61,15 @@ __all__ = [
 @hookimpl
 def register_routes():
     return router.routes()
+
+
+@hookimpl
+def extra_template_vars(datasette):
+    entry = vite_entry(
+        datasette=datasette,
+        plugin_package="datasette_google_auth",
+    )
+    return {"datasette_google_auth_vite_entry": entry}
 
 
 @hookimpl
