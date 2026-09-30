@@ -203,6 +203,31 @@ async def can_manage_sa(datasette, actor, row: CredentialRow) -> bool:
     return await _sa_allowed(datasette, SA_MANAGE, actor, row)
 
 
+#: A service-account id that can never exist (credential ids are 26-character
+#: ULIDs), checked in place of a real one by ``sa_allowed_or_decoy``.
+DECOY_SA_ID = "no-such-service-account"
+
+
+async def sa_allowed_or_decoy(
+    datasette, action: str, actor, row: CredentialRow | None
+) -> bool:
+    """``can_*_sa`` for denial paths that must cost the same whatever the id.
+
+    For a service-account row this is ``allowed(action)`` on it. For an
+    unknown id (``row`` is None) or any other type it runs the same
+    ``allowed()`` against ``DECOY_SA_ID`` instead, discards the answer and
+    returns False, so an unknown id, someone else's OAuth credential and an
+    unshared service account do the same permission work (ticket 24). The
+    OAuth credential's own id never reaches ``allowed()`` (D19).
+    """
+    if row is not None and row.type == "service_account":
+        return await _sa_allowed(datasette, action, actor, row)
+    await datasette.allowed(
+        action=action, resource=ServiceAccountResource(DECOY_SA_ID), actor=actor
+    )
+    return False
+
+
 async def sa_access(datasette, actor, row: CredentialRow) -> dict[str, bool]:
     """``{SA_USE: …, SA_EDIT: …, SA_MANAGE: …}`` for one service account, in
     one ``allowed_many()`` query (edit and manage already fold in use via

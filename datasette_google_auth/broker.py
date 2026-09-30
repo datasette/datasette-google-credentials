@@ -10,7 +10,9 @@ Access rules:
 * **OAuth** credentials are owner-only: ``owner_id == actor["id"]``, checked
   here in code. ``datasette.allowed()`` is never called for one (D6, D19).
 * **Service accounts** need ``google-service-account-use``, via the
-  type-gated ``can_use_sa``.
+  type-gated ``sa_allowed_or_decoy``: every other actor and id (unknown, or
+  someone else's OAuth credential) runs the same check against a decoy id, so
+  it costs the same as an invisible service account (ticket 24).
 * Anyone who can't use a credential and couldn't see it either gets
   ``CredentialNotFound``, exactly as for an id that doesn't exist (no ID
   probing). ``CredentialForbidden`` is only for actors who can see it but not
@@ -51,7 +53,7 @@ from .http import client
 from .internal_db import CredentialRow, InternalDB
 from .models import CredentialInfo
 from .oauth import connect_url, fetch_oauth_token, oauth_cache_key
-from .permissions import can_admin, can_use_sa, usable_sa_ids
+from .permissions import SA_USE, can_admin, sa_allowed_or_decoy, usable_sa_ids
 from .service_account import ServiceAccountKey, mint_service_account_token
 from .telemetry import credential_span, record_cache_lookup, request_call
 from .telemetry_registry import CACHE, CREDENTIAL_TYPE, TOKEN
@@ -180,16 +182,20 @@ def _reconnect_url(datasette: Datasette) -> str | None:
     return connect_url(datasette)
 
 
-async def _can_use(datasette: Datasette, actor: Actor, row: CredentialRow) -> bool:
+async def _can_use(
+    datasette: Datasette, actor: Actor, row: CredentialRow | None
+) -> bool:
+    """May the actor use ``row`` (None for an unknown id)? Anyone but an OAuth
+    credential's owner gets the same service-account check, against a decoy
+    id when ``row`` isn't a service account, so an unknown id costs the same
+    as an invisible one (ticket 24)."""
     actor_id = _actor_id(actor)
     if actor_id is None:
         return False
-    if row.type == OAUTH:
+    if row is not None and row.type == OAUTH and row.owner_id == actor_id:
         # Hard-coded owner check: never datasette.allowed() for OAuth (D6).
-        return row.owner_id == actor_id
-    if row.type == SERVICE_ACCOUNT:
-        return await can_use_sa(datasette, actor, row)
-    return False
+        return True
+    return await sa_allowed_or_decoy(datasette, SA_USE, actor, row)
 
 
 async def _authorize(
@@ -202,12 +208,14 @@ async def _authorize(
     """
     # TODO(D2): a later `system=True` mode (background jobs, no actor) goes here.
     row = await InternalDB(datasette.get_internal_database()).get(credential_id)
-    if row is None or _actor_id(actor) is None:
+    if _actor_id(actor) is None:
         raise CredentialNotFound(credential_id)
-    if not await _can_use(datasette, actor, row):
+    # An unknown id runs the same checks as an invisible one (ticket 24).
+    usable = await _can_use(datasette, actor, row)
+    if row is None or not usable:
         # Admins can already list every credential (ticket 15), so telling
         # them "forbidden" leaks nothing; everyone else can't tell it exists.
-        if await can_admin(datasette, actor):
+        if await can_admin(datasette, actor) and row is not None:
             raise CredentialForbidden("You can't use this credential")
         raise CredentialNotFound(credential_id)
 

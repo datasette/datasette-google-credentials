@@ -42,6 +42,7 @@ from datasette_google_auth.internal_db import TABLE, InternalDB
 from datasette_google_auth.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
+    DECOY_SA_ID,
     RESOURCE_TYPE,
     seed_manager,
 )
@@ -290,10 +291,14 @@ async def test_acl_grant_on_oauth_id_is_ignored(mock_google, monkeypatch):
     assert await list_credentials(datasette, actor=BOB) == []
     cred = await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS])
     await cred.token()
-    # allowed() was only ever asked global questions (google-auth-admin),
-    # never about the OAuth credential.
+    # allowed() was only ever asked global questions (google-auth-admin) or
+    # about the decoy service account (ticket 24), never about the OAuth
+    # credential.
     assert calls
-    assert all(call.get("resource") is None for call in calls)
+    assert all(
+        call.get("resource") is None or call["resource"].parent == DECOY_SA_ID
+        for call in calls
+    )
 
 
 # --- Service accounts ---------------------------------------------------------

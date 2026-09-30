@@ -46,10 +46,11 @@ from .http import client, google_error
 from .internal_db import InternalDB
 from .models import CredentialInfo
 from .permissions import (
+    SA_EDIT,
+    SA_USE,
     can_add_service_account,
     can_admin,
-    can_edit_sa,
-    can_use_sa,
+    sa_allowed_or_decoy,
     seed_manager,
 )
 from .telemetry import google_call
@@ -349,12 +350,19 @@ async def rotate_service_account_key(
     otherwise as ``add_service_account``.
     """
     idb = InternalDB(datasette.get_internal_database())
-    row = await idb.get(credential_id)
+    found = await idb.get(credential_id)
     actor_id = _actor_id(actor)
-    if row is None or row.type != TYPE or actor_id is None:
+    if actor_id is None:
         raise CredentialNotFound(credential_id)
-    if not await can_edit_sa(datasette, actor, row):
-        if await can_use_sa(datasette, actor, row) or await can_admin(datasette, actor):
+    # An unknown id or another type runs the same checks as an unshared
+    # service account, against a decoy id (ticket 24), then is NotFound.
+    row = found if found is not None and found.type == TYPE else None
+    editable = await sa_allowed_or_decoy(datasette, SA_EDIT, actor, row)
+    if row is None or not editable:
+        if (
+            await sa_allowed_or_decoy(datasette, SA_USE, actor, row)
+            or await can_admin(datasette, actor)
+        ) and row is not None:
             raise CredentialForbidden(
                 "You don't have permission to rotate this service account's key"
             )

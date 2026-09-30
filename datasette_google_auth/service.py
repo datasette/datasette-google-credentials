@@ -19,7 +19,10 @@ delete (D13).
 Errors follow the broker's no-probing rule (D23, D25): an unknown id, or
 one the actor can't see, raises ``CredentialNotFound``; one they can see
 but not change raises ``CredentialForbidden``. An actor "sees" a service
-account they may use, and an admin sees everything.
+account they may use, and an admin sees everything. An unknown id runs the
+same permission checks as an invisible one, against a decoy
+service-account id (``sa_allowed_or_decoy``), so the two cost the same
+(ticket 24).
 
 Events (``events.py``) fire for created, reconnected, rotated, deleted and
 broken; none carries a secret.
@@ -47,11 +50,10 @@ from .oauth import DEFAULT_RETURN_TO, connect_url, revoke_token
 from .permissions import (
     SA_EDIT,
     SA_MANAGE,
+    SA_USE,
     can_admin,
-    can_edit_sa,
-    can_manage_sa,
-    can_use_sa,
     sa_access,
+    sa_allowed_or_decoy,
     sa_role,
 )
 from .service_account import add_service_account, rotate_service_account_key
@@ -96,24 +98,39 @@ def _actor_id(actor: Actor) -> str | None:
 
 async def _load(
     datasette: Datasette, actor: Actor, credential_id: str
-) -> tuple[CredentialRow, str]:
-    """The row and the actor's id; ``CredentialNotFound`` for an unknown id or
-    an anonymous actor."""
+) -> tuple[CredentialRow | None, str]:
+    """The row (None for an unknown id) and the actor's id;
+    ``CredentialNotFound`` for an anonymous actor. Callers run their checks
+    on a None row too (ticket 24)."""
     row = await InternalDB(datasette.get_internal_database()).get(credential_id)
     actor_id = _actor_id(actor)
-    if row is None or actor_id is None:
+    if actor_id is None:
         raise CredentialNotFound(credential_id)
     return row, actor_id
 
 
+def _is_owner(row: CredentialRow | None, actor_id: str) -> bool:
+    """Is ``row`` the actor's own OAuth credential? Hard-coded, never
+    ``allowed()`` (D6)."""
+    return row is not None and row.type == OAUTH and row.owner_id == actor_id
+
+
 async def _deny(
-    datasette: Datasette, actor: Actor, row: CredentialRow, message: str
+    datasette: Datasette,
+    actor: Actor,
+    row: CredentialRow | None,
+    credential_id: str,
+    message: str,
 ) -> CredentialForbidden | CredentialNotFound:
     """Forbidden if the actor can see ``row`` (admin, or a service account
-    they may use), otherwise NotFound. Never ``allowed()`` for OAuth (D6)."""
-    if await can_admin(datasette, actor) or await can_use_sa(datasette, actor, row):
+    they may use), otherwise NotFound, as it is for a None (unknown) row
+    after the same checks. Never ``allowed()`` for OAuth (D6)."""
+    visible = await can_admin(datasette, actor) or await sa_allowed_or_decoy(
+        datasette, SA_USE, actor, row
+    )
+    if visible and row is not None:
         return CredentialForbidden(message)
-    return CredentialNotFound(row.id)
+    return CredentialNotFound(credential_id)
 
 
 def clean_label(label: str) -> str:
@@ -201,13 +218,16 @@ async def rename(
     Fires no event.
     """
     row, actor_id = await _load(datasette, actor, credential_id)
-    if row.type == OAUTH:
-        allowed = row.owner_id == actor_id
-    else:
-        allowed = await can_edit_sa(datasette, actor, row)
-    if not allowed:
+    allowed = _is_owner(row, actor_id) or await sa_allowed_or_decoy(
+        datasette, SA_EDIT, actor, row
+    )
+    if row is None or not allowed:
         raise await _deny(
-            datasette, actor, row, "You don't have permission to rename this credential"
+            datasette,
+            actor,
+            row,
+            credential_id,
+            "You don't have permission to rename this credential",
         )
     label = clean_label(label)
     idb = InternalDB(datasette.get_internal_database())
@@ -231,11 +251,14 @@ async def reconnect_url(datasette: Datasette, actor: Actor, credential_id: str) 
     the actor's own OAuth credential (``CredentialForbidden`` for an admin).
     """
     row, actor_id = await _load(datasette, actor, credential_id)
-    if row.type != OAUTH:
-        raise CredentialNotFound(credential_id)
-    if row.owner_id != actor_id:
+    if not _is_owner(row, actor_id):
         raise await _deny(
-            datasette, actor, row, "Only the owner can reconnect a Google account"
+            datasette,
+            actor,
+            # A service account is NotFound here, even for an admin.
+            row if row is not None and row.type == OAUTH else None,
+            credential_id,
+            "Only the owner can reconnect a Google account",
         )
     return connect_url(datasette, return_to=datasette.urls.path(DEFAULT_RETURN_TO))
 
@@ -260,17 +283,23 @@ async def delete(
 
     Either way the token cache is evicted and the deleted event fired.
     """
-    row, _ = await _load(datasette, actor, credential_id)
-    if row.type == OAUTH:
-        allowed = row.owner_id == _actor_id(actor) or await can_admin(datasette, actor)
-    else:
-        allowed = await can_manage_sa(datasette, actor, row) or await can_admin(
-            datasette, actor
-        )
+    row, actor_id = await _load(datasette, actor, credential_id)
+    allowed = (
+        _is_owner(row, actor_id)
+        or await sa_allowed_or_decoy(datasette, SA_MANAGE, actor, row)
+        or await can_admin(datasette, actor)
+    )
     if not allowed:
         raise await _deny(
-            datasette, actor, row, "You don't have permission to delete this credential"
+            datasette,
+            actor,
+            row,
+            credential_id,
+            "You don't have permission to delete this credential",
         )
+    if row is None:
+        # Only an admin gets here, and admins see every id anyway.
+        raise CredentialNotFound(credential_id)
 
     if row.type == OAUTH:
         result = await _revoke(datasette, row)

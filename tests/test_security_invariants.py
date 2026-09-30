@@ -10,7 +10,8 @@ one module's behaviour:
 * ``Credential.request()`` sends the bearer token only to Google (D34);
 * OAuth access never goes through ``datasette.allowed()`` (D6, D19);
 * ``get_credential`` / ``token()`` re-read the row, whatever the cache holds;
-* unknown ids and other people's ids are indistinguishable on the API;
+* unknown ids and other people's ids are indistinguishable on the API, and
+  do the same permission work (ticket 24);
 * every POST is CSRF-protected, ``return_to`` can't redirect off-site;
 * every outbound client has timeouts; labels are escaped in every page;
 * removing or changing ``encryption-key`` after credentials exist fails
@@ -58,6 +59,7 @@ from datasette_google_auth import (
     get_credential,
     list_credentials,
 )
+from datasette_google_auth import service as service_module
 from datasette_google_auth import service_account as service_account_module
 from datasette_google_auth.broker import check_request_url
 from datasette_google_auth.crypto import encrypt_secret
@@ -74,6 +76,7 @@ from datasette_google_auth.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     CONNECT,
+    DECOY_SA_ID,
     RESOURCE_TYPE,
 )
 from datasette_google_auth.router import router
@@ -986,6 +989,80 @@ async def test_unknown_and_invisible_ids_look_the_same(
     assert len(messages) == 1
     # Nothing was changed along the way.
     assert (await idb(datasette).get(sa.id)).label == sa.label
+
+
+@pytest.mark.asyncio
+async def test_unknown_and_invisible_ids_do_the_same_permission_work(
+    mock_google, service_account_keys, monkeypatch
+):
+    """Ticket 24: an unknown id runs the same row read and the same
+    allowed()/allowed_many() calls, in the same order, as alice's OAuth
+    connection or her unshared service account, so timing can't tell them
+    apart either. The OAuth id itself never reaches allowed() (D19): its
+    checks, like the unknown id's, run against DECOY_SA_ID."""
+    datasette = await make_datasette(mock_google)
+    sa = await add_sa(datasette, service_account_keys)
+    oauth_row = await add_oauth(datasette, mock_google)
+    key_json = raw(service_account_keys["test"])
+
+    calls: list[tuple] = []
+    current_id = None
+    real_get = InternalDB.get
+    real_allowed, real_allowed_many = datasette.allowed, datasette.allowed_many
+
+    def resource(r):
+        if r is None:
+            return None
+        assert r.parent != oauth_row.id  # D19
+        # The real id or the decoy; which one is the point of the decoy.
+        return (r.name, "<id>" if r.parent in {current_id, DECOY_SA_ID} else r.parent)
+
+    async def spy_get(self, id):
+        calls.append(("get", "<id>" if id == current_id else id))
+        return await real_get(self, id)
+
+    async def spy_allowed(**kwargs):
+        calls.append(("allowed", kwargs["action"], resource(kwargs.get("resource"))))
+        return await real_allowed(**kwargs)
+
+    async def spy_allowed_many(**kwargs):
+        calls.append(
+            (
+                "allowed_many",
+                tuple(kwargs["actions"]),
+                resource(kwargs.get("resource")),
+            )
+        )
+        return await real_allowed_many(**kwargs)
+
+    monkeypatch.setattr(InternalDB, "get", spy_get)
+    monkeypatch.setattr(datasette, "allowed", spy_allowed)
+    monkeypatch.setattr(datasette, "allowed_many", spy_allowed_many)
+
+    operations = {
+        "get_credential": lambda id: get_credential(
+            datasette, id, actor=BOB, scopes=[SCOPE_SHEETS]
+        ),
+        "rename": lambda id: service_module.rename(datasette, BOB, id, "x"),
+        "rotate-key": lambda id: service_module.rotate_service_account_key(
+            datasette, BOB, id, key_json
+        ),
+        "delete": lambda id: service_module.delete(datasette, BOB, id),
+        "reconnect": lambda id: service_module.reconnect_url(datasette, BOB, id),
+    }
+    for name, operation in operations.items():
+        sequences = {}
+        for credential_id in (UNKNOWN_ID, oauth_row.id, sa.id):
+            current_id = credential_id
+            calls.clear()
+            with pytest.raises(CredentialNotFound):
+                await operation(credential_id)
+            sequences[credential_id] = list(calls)
+        assert sequences[UNKNOWN_ID] == sequences[oauth_row.id], name
+        assert sequences[UNKNOWN_ID] == sequences[sa.id], name
+        assert any(call[0] == "allowed" for call in sequences[UNKNOWN_ID]), name
+    assert (await real_get(idb(datasette), sa.id)).label == sa.label
+    assert await real_get(idb(datasette), oauth_row.id) is not None
 
 
 def _post_routes() -> list[str]:
