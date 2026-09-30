@@ -1,0 +1,11 @@
+# Plugin config for the manual OAuth checklist (tests/live/OAUTH_CHECKLIST.md):
+#   just dev -c tests/live/oauth-dev.yml --root
+# Every value comes from the environment; nothing secret lives in this file.
+plugins:
+  datasette-google-auth:
+    encryption-key:
+      $env: DATASETTE_GOOGLE_AUTH_KEY
+    client_id:
+      $env: DATASETTE_GOOGLE_AUTH_CLIENT_ID
+    client_secret:
+      $env: DATASETTE_GOOGLE_AUTH_CLIENT_SECRET

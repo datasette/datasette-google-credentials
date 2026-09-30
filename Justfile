@@ -73,8 +73,16 @@ check:
 
 # === Testing ===
 
+# Never collects tests/live/ (pyproject `norecursedirs`) or contacts Google.
 test *flags:
   uv run pytest {{flags}}
+
+# Opt-in tests against real Google with a service-account key; Alex runs them,
+# never CI. Skips everything, saying why, unless DATASETTE_GOOGLE_AUTH_LIVE_SA_KEY
+# (path to a key file) and DATASETTE_GOOGLE_AUTH_LIVE_SHEET are set. Setup and the
+# manual OAuth checklist: tests/live/SETUP.md, tests/live/OAUTH_CHECKLIST.md.
+test-live *flags:
+  uv run pytest tests/live -rs --tb=short {{flags}}
 
 # === Development ===
 

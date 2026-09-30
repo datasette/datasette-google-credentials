@@ -66,6 +66,13 @@ datasette-acl-share = { path = "../datasette-acl-share", editable = true }
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
+# tests/live/ talks to real Google: never collected by a plain `pytest` /
+# `just test`, only when named (`just test-live`). The rest are pytest's
+# defaults, which this setting replaces.
+norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "live"]
+markers = [
+    "live: calls real Google; opt-in via `just test-live` (tests/live/SETUP.md)",
+]
 
 [tool.setuptools.package-data]
 datasette_google_auth = ["static/**/*", "templates/*", "manifest.json"]

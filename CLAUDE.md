@@ -42,7 +42,8 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 | `just types-check-fresh` | Regenerate types and fail if they differ from git |
 | `just format` | ruff fix + format, prettier (frontend) |
 | `just check` | ty + ruff lint + ruff format check + svelte-check |
-| `just test` | Run Python tests (pytest, asyncio strict) |
+| `just test` | Run Python tests (pytest, asyncio strict); never collects `tests/live/` |
+| `just test-live` | Opt-in live tests against real Google (`tests/live/SETUP.md`); Alex runs them, never CI or agents |
 | `just clean-dev` | Delete `.tmp/` (dev databases) |
 | `just dev-otel` | `just dev` plus `../datasette-otel-viewer` (spans and metrics at `/-/otel`) |
 | `just telemetry-doc` / `telemetry-doc-check` | Regenerate / verify README's telemetry reference from the registry |
@@ -112,7 +113,14 @@ tests/
 ├── test_smoke.py
 ├── test_telemetry.py          # One test per span/metric
 ├── test_telemetry_registry.py # Conformance both ways + privacy walk + SDK-import check
-└── test_token_cache.py
+├── test_token_cache.py
+└── live/                      # Opt-in, real Google; `norecursedirs` keeps it out of `just test`
+    ├── conftest.py            # Skips without the env vars; overrides the network block; redacted key
+    ├── live_support.py        # Names shared by conftest.py and test_live.py
+    ├── test_live.py           # SA: add (live exchange), read, write/read back, delete, bogus token_uri
+    ├── oauth-dev.yml          # `just dev -c tests/live/oauth-dev.yml --root` config (all `$env`)
+    ├── SETUP.md               # GCP project, Sheets API, SA key, sharing the sheet
+    └── OAUTH_CHECKLIST.md     # Manual Connect Google pass + samples + telemetry; results table
 ```
 
 
@@ -162,6 +170,10 @@ Pages (`routes/pages.py`, rendered by `render_page()`):
 - `DATASETTE_SECRET` — required for the dev server (`just dev` sets it)
 - `DATASETTE_GOOGLE_AUTH_KEY` — Fernet encryption key, usually wired as
   `encryption-key: {"$env": "DATASETTE_GOOGLE_AUTH_KEY"}` (ticket 04)
+- `DATASETTE_GOOGLE_AUTH_LIVE_SA_KEY` (path to a key file) and
+  `DATASETTE_GOOGLE_AUTH_LIVE_SHEET` — only for `just test-live`
+- `DATASETTE_GOOGLE_AUTH_CLIENT_ID` / `_CLIENT_SECRET` — only for
+  `tests/live/oauth-dev.yml` (the manual OAuth checklist)
 
 ## Invariants
 
@@ -174,7 +186,10 @@ Pages (`routes/pages.py`, rendered by `render_page()`):
 - Google URLs come only from config. Never honour a key file's `token_uri`.
 - The default test suite never contacts real Google; use the `mock_google`
   fixture (`tests/fixtures_google.py`). Internet sockets and DNS are blocked
-  for the whole suite.
+  for the whole suite. Only `tests/live/` talks to Google: it overrides the
+  block, is never collected by `just test`, and agents never run it.
+- Live tests never print key material or tokens: the key goes around as
+  `SecretText` (redacted repr), and nothing asserts on a token's value.
 
 ## Key Conventions
 
