@@ -10,10 +10,17 @@ frontend-dev *flags:
   @echo "frontend/ does not exist yet (ticket 13)"
 
 # === Type Generation ===
-# Stub until ticket 13 adds page_data.py, the typegen script and frontend/.
+# `types` is a stub until ticket 13 adds page_data.py, the typegen script and
+# frontend/. Ticket 13 then adds datasette-cron's `types-routes`:
+#   just openapi | npx --prefix frontend openapi-typescript > frontend/api.d.ts
+
+# Print the JSON API's OpenAPI document (from the router's Pydantic models).
+# Importing the router imports the package, which registers every route.
+openapi:
+  @uv run python -c 'from datasette_google_auth.router import router; import json; print(json.dumps(router.openapi_document_json(), indent=2))'
 
 types:
-  @echo "type generation arrives with the frontend (ticket 13)"
+  @echo "type generation arrives with the frontend (ticket 13); see 'just openapi'"
 
 # === Formatting ===
 

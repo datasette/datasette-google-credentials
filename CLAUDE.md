@@ -37,6 +37,7 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 | `just dev-with-hmr` | Datasette + Vite HMR (restarts on .py/.html changes) |
 | `just frontend-dev` | Vite dev server on port 5182 (stub until ticket 13) |
 | `just frontend` | Build frontend for production (stub until ticket 13) |
+| `just openapi` | Print the JSON API's OpenAPI document (input to `api.d.ts` from ticket 13) |
 | `just types` | Regenerate TypeScript types from Python (stub until ticket 13) |
 | `just format` | ruff fix + format |
 | `just check` | ty + ruff lint + ruff format check |
@@ -50,6 +51,7 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 ```
 datasette_google_auth/
 ├── __init__.py              # Plugin hooks + re-exports the public broker API (`__all__`)
+├── admin.py                 # list_all_credentials: google-auth-admin's info-only view (never grants use)
 ├── broker.py                # list_credentials / get_credential / Credential.token() + .request()
 ├── cli.py                   # `datasette google-auth generate-key | rotate-keys`
 ├── config.py                # Pydantic plugin config, validated at startup
@@ -59,20 +61,21 @@ datasette_google_auth/
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
-├── models.py                # CredentialInfo, DeleteResult: secret-free public views
+├── models.py                # CredentialInfo, AdminCredentialInfo, DeleteResult: secret-free public views
 ├── oauth.py                 # Connect Google: PKCE + signed state flow, code exchange, refresh
 ├── permissions.py           # Actions, ServiceAccountResource, acl roles, can_* helpers
-├── router.py                # Shared Router instance
+├── router.py                # Shared Router; every view's request body capped at 16 KB (JSON 413)
 ├── service.py               # Lifecycle for routes: rename / rotate / reconnect_url / delete (+ revoke)
 ├── service_account.py       # parse_key (ignores token_uri), mint_token, add / rotate SA keys
 ├── tokens.py                # Token(access_token, expires_at epoch secs, scopes); repr hides the token
 ├── token_cache.py           # TokenCache (in-memory, per-process, LRU) + get_token_cache(datasette)
 └── routes/
     ├── pages.py             # Page routes (render HTML) + OAuth connect/callback redirects
-    └── api.py               # API routes (return JSON)
+    └── api.py               # JSON API (Pydantic in/out, OpenAPI); every GoogleAuthError → error_response
 samples/                     # Consumer sample plugins (importer, exporter)
 tests/
 ├── conftest.py              # Imports shared fixtures; later tickets add theirs here
+├── test_api.py
 ├── fixtures_google.py       # mock_google fixture, service_account_keys, network block
 ├── mock_google/             # In-process mock Google (OAuth, SA tokens, minimal Sheets)
 ├── test_broker.py
@@ -98,9 +101,19 @@ Planned per the house layout (D18): `page_data.py`,
   `client_id`/`client_secret`, 403 without `google-auth-connect`)
 - `GET /-/google-auth/oauth/callback` → OAuth redirect URI
 
+JSON API (`routes/api.py`). Errors are `error_response()` JSON
+(`{ok: false, error, code, ...}`); ids the actor may not know about are 404.
+POSTs need no CSRF token (Datasette checks `Sec-Fetch-Site`/`Origin`).
+- `GET /-/google-auth/api/status` → setup-notice flags + permissions (any actor)
+- `GET /-/google-auth/api/credentials?scopes=a,b` → `{credentials: CredentialInfo[]}`, mirrors `list_credentials()`
+- `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` → `{credentials: AdminCredentialInfo[]}` (`google-auth-admin`, info only)
+- `POST /-/google-auth/api/service-accounts` `{label?, key_json}` → CredentialInfo + `share_with_email`
+- `POST /-/google-auth/api/credentials/{id}/rename` `{label}` → CredentialInfo
+- `POST /-/google-auth/api/credentials/{id}/rotate-key` `{key_json}` → CredentialInfo
+- `POST /-/google-auth/api/credentials/{id}/delete` → DeleteResult
+
 Planned (D13):
 - `GET /-/google-auth` → management page
-- `GET /-/google-auth/api/credentials?scopes=...` → mirrors `list_credentials()`
 
 ## Hooks Used
 
@@ -137,6 +150,11 @@ Planned (D13):
 
 - **`__init__.py` is hooks only** (plus re-exports of the public API). Logic goes in its own module.
 - **`datasette.allowed(...)` is keyword-only.**
+- **No `from __future__ import annotations` in `routes/`**: datasette-plugin-router reads real
+  annotation objects (`Annotated[Model, Body()]`, `str` path params); string annotations silently
+  drop the request body and path params.
+- **Route handlers never let a `GoogleAuthError` escape**: catch it and return `error_response()`.
+  Handlers that take `key_json` also catch every other exception (log type + stack, never the message).
 - **httpx2, not httpx.**
 - **Svelte 5 runes**: `$state()`, `$derived()`, `$effect()`, `$props()`
 - **IDs**: `python-ulid`

@@ -45,6 +45,29 @@ class CredentialInfo(BaseModel):
         )
 
 
+class AdminCredentialInfo(CredentialInfo):
+    """One credential as a ``google-auth-admin`` sees it in the "All
+    credentials" view (ticket 15): ``CredentialInfo`` plus who owns it and
+    who used it last. Information only: it never grants use (D6)."""
+
+    owner_id: str
+    created_by: str
+    last_used_at: str | None
+    last_used_by: str | None
+
+    @classmethod
+    def from_row(
+        cls, row: CredentialRow, actor: dict[str, Any] | None
+    ) -> AdminCredentialInfo:
+        return cls(
+            **CredentialInfo.from_row(row, actor).model_dump(),
+            owner_id=row.owner_id,
+            created_by=row.created_by,
+            last_used_at=row.last_used_at,
+            last_used_by=row.last_used_by,
+        )
+
+
 class DeleteResult(BaseModel):
     """What ``service.delete()`` did, for the UI to report. No secrets.
 
