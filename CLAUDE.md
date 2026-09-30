@@ -90,7 +90,8 @@ frontend/
 scripts/typegen-pagedata.py  # page_data.__exports__ → JSON Schema
 scripts/telemetry-doc.py     # Renders README's telemetry reference from telemetry_registry
 samples/                     # Consumer sample plugins: public API only (importer, exporter)
-└── google_sheets_import.py  # One-shot sheet → table import at /-/google-sheets-import/<db>
+├── google_sheets_import.py  # One-shot sheet → table import at /-/google-sheets-import/<db>
+└── google_sheets_export.py  # Table / query → new or existing sheet at /-/google-sheets-export (RAW, capped, chunked)
 tests/
 ├── conftest.py              # Imports shared fixtures; later tickets add theirs here
 ├── test_api.py
@@ -106,6 +107,7 @@ tests/
 ├── test_lifecycle.py
 ├── test_permissions.py
 ├── test_sample_importer.py  # Loads samples/ via plugins_dir; unregisters after
+├── test_sample_exporter.py  # Same pattern; patches caps on the plugins_dir-loaded module
 ├── test_service_account.py
 ├── test_smoke.py
 ├── test_telemetry.py          # One test per span/metric
@@ -119,7 +121,9 @@ tests/
 - `GET /-/google-auth/connect?return_to=/...` → start OAuth connect (404 without
   `client_id`/`client_secret`, 403 without `google-auth-connect`)
 - `GET /-/google-auth/oauth/callback` → OAuth redirect URI
-- Sample (only with `--plugins-dir samples`): `GET|POST /-/google-sheets-import/<db>`
+- Samples (only with `--plugins-dir samples`): `GET|POST /-/google-sheets-import/<db>`,
+  `GET|POST /-/google-sheets-export?database=..&table=..|sql=..` (service accounts
+  export only into existing sheets shared with them as Editor, D28)
 
 Scope matching (`broker.missing_scopes`) uses the D27 implication table
 (`SCOPE_IMPLIES`): `spreadsheets` covers `spreadsheets.readonly`, `drive` covers
