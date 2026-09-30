@@ -52,6 +52,8 @@ from .models import CredentialInfo
 from .oauth import connect_url, fetch_oauth_token, oauth_cache_key
 from .permissions import can_admin, can_use_sa, usable_sa_ids
 from .service_account import ServiceAccountKey, mint_service_account_token
+from .telemetry import credential_span, record_cache_lookup, request_call
+from .telemetry_registry import CACHE, CREDENTIAL_TYPE, TOKEN
 from .token_cache import CacheKey, get_token_cache
 from .tokens import Token
 
@@ -208,25 +210,33 @@ async def _service_account_token(
 
 async def _token_for_row(
     datasette: Datasette, row: CredentialRow, scopes: list[str], actor_id: str
-) -> Token:
-    """Through the token cache. Only call with a row ``_authorize`` returned."""
+) -> tuple[Token, bool]:
+    """Through the token cache: ``(token, hit)``, where ``hit`` is False if
+    it had to be fetched. Only call with a row ``_authorize`` returned."""
     cache = get_token_cache(datasette)
+    fetched = False
     if row.type == OAUTH:
 
         async def fetch_oauth() -> Token:
+            nonlocal fetched
+            fetched = True
             return await fetch_oauth_token(datasette, row, actor_id=actor_id)
 
         # OAuth tokens carry the granted scopes, whatever was asked for.
-        return await cache.get_or_fetch(oauth_cache_key(row), fetch_oauth)
+        token = await cache.get_or_fetch(oauth_cache_key(row), fetch_oauth)
+    else:
+        requested = sorted(set(scopes))
 
-    requested = sorted(set(scopes))
+        async def fetch_service_account() -> Token:
+            nonlocal fetched
+            fetched = True
+            return await _service_account_token(datasette, row, requested, actor_id)
 
-    async def fetch_service_account() -> Token:
-        return await _service_account_token(datasette, row, requested, actor_id)
-
-    return await cache.get_or_fetch(
-        CacheKey.for_row(row, requested), fetch_service_account
-    )
+        token = await cache.get_or_fetch(
+            CacheKey.for_row(row, requested), fetch_service_account
+        )
+    record_cache_lookup(row.type, hit=not fetched)
+    return token, not fetched
 
 
 class TouchThrottle:
@@ -313,13 +323,20 @@ class Credential:
 
         Never log or return the token to a browser.
         """
-        row = await _authorize(self._datasette, self.id, self._actor, self._scopes)
-        self.info = CredentialInfo.from_row(row, self._actor)
-        actor_id = _actor_id(self._actor)
-        assert actor_id is not None  # _authorize rejects anonymous actors
-        token = await _token_for_row(self._datasette, row, self._scopes, actor_id)
-        await _touch_used(self._datasette, row.id, actor_id)
-        return token.access_token
+        with credential_span(TOKEN, self.id) as span:
+            row = await _authorize(self._datasette, self.id, self._actor, self._scopes)
+            if span.is_recording():
+                span.set_attribute(CREDENTIAL_TYPE, row.type)
+            self.info = CredentialInfo.from_row(row, self._actor)
+            actor_id = _actor_id(self._actor)
+            assert actor_id is not None  # _authorize rejects anonymous actors
+            token, hit = await _token_for_row(
+                self._datasette, row, self._scopes, actor_id
+            )
+            if span.is_recording():
+                span.set_attribute(CACHE, "hit" if hit else "miss")
+            await _touch_used(self._datasette, row.id, actor_id)
+            return token.access_token
 
     async def request(self, method: str, url: str, **kwargs: Any) -> httpx2.Response:
         """Make an authenticated request to a Google API.
@@ -334,14 +351,19 @@ class Credential:
         # TODO(ticket 22): restrict `url` to an allowlist of Google API hosts
         # (needs Alex's decision); for now any URL gets the bearer token.
         headers = httpx2.Headers(kwargs.pop("headers", None))
-        async with client(self._datasette) as http:
-            headers["Authorization"] = f"Bearer {await self.token()}"
-            response = await http.request(method, url, headers=headers, **kwargs)
-            if response.status_code != 401:
+        with request_call(self.id, self.info.type, method, url) as call:
+            async with client(self._datasette) as http:
+                headers["Authorization"] = f"Bearer {await self.token()}"
+                response = await http.request(method, url, headers=headers, **kwargs)
+                call.status = response.status_code
+                if response.status_code != 401:
+                    return response
+                call.retried = True
+                get_token_cache(self._datasette).evict(self.id)
+                headers["Authorization"] = f"Bearer {await self.token()}"
+                response = await http.request(method, url, headers=headers, **kwargs)
+                call.status = response.status_code
                 return response
-            get_token_cache(self._datasette).evict(self.id)
-            headers["Authorization"] = f"Bearer {await self.token()}"
-            return await http.request(method, url, headers=headers, **kwargs)
 
 
 async def list_credentials(

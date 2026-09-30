@@ -111,6 +111,11 @@ class TokenStore:
             return None
         return issued.principal
 
+    def issued_tokens(self) -> list[str]:
+        """Every access token issued and not revoked (for leak checks)."""
+        with self._lock:
+            return list(self._tokens)
+
     def pop(self, token: str) -> IssuedToken | None:
         with self._lock:
             return self._tokens.pop(token, None)

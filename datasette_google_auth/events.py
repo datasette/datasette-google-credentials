@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 from datasette.events import Event
 
 from .internal_db import CredentialRow, InternalDB
+from .telemetry import record_broken
 from .token_cache import get_token_cache
 
 if TYPE_CHECKING:
@@ -148,6 +149,7 @@ async def mark_broken(
     if not await idb.mark_broken(row.id, detail, expected_secret=row.secret_encrypted):
         return False
     get_token_cache(datasette).evict(row.id)
+    record_broken(row.type)
     await track_credential_event(
         datasette,
         CredentialBrokenEvent,

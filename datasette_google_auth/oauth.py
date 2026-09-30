@@ -60,6 +60,14 @@ from .events import (
 from .http import client, google_error
 from .internal_db import CredentialRow, InternalDB
 from .permissions import can_connect
+from .telemetry import Callback, callback_span, clamp_google_error, google_call
+from .telemetry_registry import (
+    OAUTH_EXCHANGE,
+    OAUTH_REVOKE,
+    OAUTH_USERINFO,
+    REFRESH_TOKEN_ROTATED,
+    TOKEN_REFRESH,
+)
 from .token_cache import CacheKey, TokenCache, get_token_cache
 from .tokens import Token
 
@@ -361,14 +369,25 @@ def _check_state(
 async def finish_connect(datasette: Datasette, request: Request) -> Response:
     """``GET /-/google-auth/oauth/callback``: Google redirects back here."""
     actor_id = await _require_connect(datasette, request)
+    with callback_span() as callback:
+        return await _finish_connect(datasette, request, actor_id, callback)
+
+
+async def _finish_connect(
+    datasette: Datasette, request: Request, actor_id: str, callback: Callback
+) -> Response:
+    """The callback body. Sets ``callback.result`` before every return."""
     state = read_state(datasette, request.args.get("state"))
     cookie = _read_flow_cookie(datasette, request)
     problem = _check_state(state, cookie, actor_id, now=time.time())
     if problem is not None or state is None or cookie is None:
+        callback.result = "invalid_state"
         return await _error_page(datasette, request, problem or "Invalid request")
 
     error = request.args.get("error")
     if error:
+        callback.google_error = clamp_google_error(error)
+        callback.result = "cancelled" if error == "access_denied" else "google_error"
         if error == "access_denied":
             message = "Google connection cancelled"
         elif _ERROR_CODE.match(error):
@@ -380,6 +399,7 @@ async def finish_connect(datasette: Datasette, request: Request) -> Response:
 
     code = request.args.get("code")
     if not code:
+        callback.result = "no_code"
         return await _error_page(
             datasette, request, "Google didn't return an authorization code."
         )
@@ -395,10 +415,12 @@ async def finish_connect(datasette: Datasette, request: Request) -> Response:
                 redirect_uri=redirect_uri(datasette, request, config),
             )
             if not granted.refresh_token:
+                callback.result = "no_refresh_token"
                 return await _error_page(datasette, request, NO_REFRESH_TOKEN)
             sub, email = await fetch_userinfo(http, config, granted.token.access_token)
     except CredentialBroken as ex:
         # invalid_grant on the code: reused, expired, or PKCE mismatch.
+        callback.result = "invalid_grant"
         return await _error_page(
             datasette,
             request,
@@ -406,8 +428,10 @@ async def finish_connect(datasette: Datasette, request: Request) -> Response:
             " Please try connecting again.",
         )
     except EncryptionNotConfigured as ex:
+        callback.result = "not_configured"
         return await _error_page(datasette, request, str(ex), status=503)
     except GoogleTokenError as ex:
+        callback.result = "token_error"
         return await _error_page(datasette, request, str(ex), status=502)
 
     scopes = sorted(granted.token.scopes)
@@ -451,6 +475,9 @@ async def finish_connect(datasette: Datasette, request: Request) -> Response:
             + "). Reconnect and tick every box to fix this.",
             datasette.WARNING,
         )
+    callback.result = "created" if created else "reconnected"
+    callback.credential_id = row.id
+    callback.scopes_missing = len(missing)
     return _redirect(datasette, state.return_to)
 
 
@@ -534,19 +561,21 @@ async def exchange_code(
     ``invalid_grant`` (bad/used/expired code or verifier) and
     ``GoogleTokenError`` otherwise.
     """
-    response = await _post_token(
-        http,
-        config,
-        {
-            "grant_type": "authorization_code",
-            "code": code,
-            "code_verifier": code_verifier,
-            "client_id": config.client_id or "",
-            "client_secret": config.client_secret or "",
-            "redirect_uri": redirect_uri,
-        },
-    )
-    return _parse_token_reply(response, config.scopes)
+    with google_call("exchange", OAUTH_EXCHANGE) as call:
+        response = await _post_token(
+            http,
+            config,
+            {
+                "grant_type": "authorization_code",
+                "code": code,
+                "code_verifier": code_verifier,
+                "client_id": config.client_id or "",
+                "client_secret": config.client_secret or "",
+                "redirect_uri": redirect_uri,
+            },
+        )
+        call.response(response)
+        return _parse_token_reply(response, config.scopes)
 
 
 async def fetch_userinfo(
@@ -557,25 +586,27 @@ async def fetch_userinfo(
     Userinfo rather than verifying the ``id_token``: no JWKS fetch, and the
     token was minted a moment ago over TLS from the token endpoint.
     """
-    try:
-        response = await http.get(
-            config.google_base_urls.userinfo,
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-    except httpx2.HTTPError as ex:
-        raise GoogleTokenError(None, type(ex).__name__) from None
-    if response.status_code != 200:
-        error, description = google_error(response)
-        raise GoogleTokenError(response.status_code, error, description)
-    try:
-        body = response.json()
-    except ValueError:
-        body = None
-    sub = body.get("sub") if isinstance(body, dict) else None
-    if not isinstance(sub, str) or not sub:
-        raise GoogleTokenError(200, "invalid_response", "no sub in userinfo reply")
-    email = body.get("email") if isinstance(body, dict) else None
-    return sub, email if isinstance(email, str) and email else None
+    with google_call("userinfo", OAUTH_USERINFO) as call:
+        try:
+            response = await http.get(
+                config.google_base_urls.userinfo,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+        except httpx2.HTTPError as ex:
+            raise GoogleTokenError(None, type(ex).__name__) from None
+        call.response(response)
+        if response.status_code != 200:
+            error, description = google_error(response)
+            raise GoogleTokenError(response.status_code, error, description)
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        sub = body.get("sub") if isinstance(body, dict) else None
+        if not isinstance(sub, str) or not sub:
+            raise GoogleTokenError(200, "invalid_response", "no sub in userinfo reply")
+        email = body.get("email") if isinstance(body, dict) else None
+        return sub, email if isinstance(email, str) and email else None
 
 
 async def refresh_access_token(
@@ -593,17 +624,23 @@ async def refresh_access_token(
     ``CredentialBroken`` on ``invalid_grant`` without touching the database
     (``fetch_oauth_token`` marks the row), ``GoogleTokenError`` otherwise.
     """
-    response = await _post_token(
-        http,
-        config,
-        {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": config.client_id or "",
-            "client_secret": config.client_secret or "",
-        },
-    )
-    return _parse_token_reply(response, scopes)
+    with google_call("refresh", TOKEN_REFRESH) as call:
+        response = await _post_token(
+            http,
+            config,
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": config.client_id or "",
+                "client_secret": config.client_secret or "",
+            },
+        )
+        call.response(response)
+        granted = _parse_token_reply(response, scopes)
+        call.set(
+            REFRESH_TOKEN_ROTATED, granted.refresh_token not in (None, refresh_token)
+        )
+        return granted
 
 
 async def revoke_token(datasette: Datasette, token: str) -> str | None:
@@ -615,12 +652,17 @@ async def revoke_token(datasette: Datasette, token: str) -> str | None:
     error's class name, never the token.
     """
     url = get_config(datasette).google_base_urls.oauth_revoke
-    try:
-        async with client(datasette) as http:
-            response = await http.post(url, data={"token": token})
-    except httpx2.HTTPError as ex:
-        # The exception text may include the request (and so the token).
-        return f"no response from Google ({type(ex).__name__})"
+    with google_call("revoke", OAUTH_REVOKE) as call:
+        try:
+            async with client(datasette) as http:
+                response = await http.post(url, data={"token": token})
+        except httpx2.HTTPError as ex:
+            call.outcome = "network_error"
+            # The exception text may include the request (and so the token).
+            return f"no response from Google ({type(ex).__name__})"
+        call.response(response)
+        if response.status_code != 200:
+            call.outcome = "http_error"
     if response.status_code == 200:
         return None
     error, description = google_error(response)

@@ -25,6 +25,7 @@ quietly reaching the mock.
 
 from __future__ import annotations
 
+import inspect
 import json
 import threading
 from dataclasses import dataclass, field
@@ -247,7 +248,21 @@ def create_app(
     for sa in service_accounts:
         state.tokens.register_service_account(sa.client_email, sa.public_key)
 
-    app = FastAPI(title="mock_google", docs_url=None, redoc_url=None, openapi_url=None)
+    kwargs: dict[str, Any] = {}
+    if "telemetry" in inspect.signature(FastAPI).parameters:
+        # FastAPI >= 0.142 traces itself. The mock stands in for Google, so
+        # its server spans aren't Datasette's: keep them out of the telemetry
+        # tests (and the privacy walk).
+        kwargs["telemetry"] = {
+            "tracing": False,
+            "metrics": False,
+            "logs": False,
+            "operation_spans": False,
+            "auto_configure": False,
+        }
+    app = FastAPI(
+        title="mock_google", docs_url=None, redoc_url=None, openapi_url=None, **kwargs
+    )
 
     # --- OAuth ---------------------------------------------------------------
 

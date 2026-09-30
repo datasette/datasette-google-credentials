@@ -44,6 +44,8 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 | `just check` | ty + ruff lint + ruff format check + svelte-check |
 | `just test` | Run Python tests (pytest, asyncio strict) |
 | `just clean-dev` | Delete `.tmp/` (dev databases) |
+| `just dev-otel` | `just dev` plus `../datasette-otel-viewer` (spans and metrics at `/-/otel`) |
+| `just telemetry-doc` / `telemetry-doc-check` | Regenerate / verify README's telemetry reference from the registry |
 | `uv run datasette google-auth generate-key` | Print a new Fernet key for `encryption-key` |
 | `uv run datasette google-auth rotate-keys --internal X -c cfg.yml` | Re-encrypt every credential with the first key |
 
@@ -69,6 +71,8 @@ datasette_google_auth/
 ├── router.py                # Shared Router; every view's request body capped at 16 KB (JSON 413)
 ├── service.py               # Lifecycle for routes: rename / rotate / reconnect_url / delete (+ revoke)
 ├── service_account.py       # parse_key (ignores token_uri), mint_token, add / rotate SA keys
+├── telemetry.py             # OTel tracer/meter (API only): google_call, token/request/callback spans
+├── telemetry_registry.py    # Every span, metric and attribute name (D29); drives the README reference
 ├── tokens.py                # Token(access_token, expires_at epoch secs, scopes); repr hides the token
 ├── token_cache.py           # TokenCache (in-memory, per-process, LRU) + get_token_cache(datasette)
 └── routes/
@@ -84,6 +88,7 @@ frontend/
     ├── page_data/           # load.ts + generated <Model>_schema.json / .types.ts (committed)
     └── pages/{index,admin}/ # index.ts mounts <Name>Page.svelte into #app-root
 scripts/typegen-pagedata.py  # page_data.__exports__ → JSON Schema
+scripts/telemetry-doc.py     # Renders README's telemetry reference from telemetry_registry
 samples/                     # Consumer sample plugins: public API only (importer, exporter)
 └── google_sheets_import.py  # One-shot sheet → table import at /-/google-sheets-import/<db>
 tests/
@@ -103,6 +108,8 @@ tests/
 ├── test_sample_importer.py  # Loads samples/ via plugins_dir; unregisters after
 ├── test_service_account.py
 ├── test_smoke.py
+├── test_telemetry.py          # One test per span/metric
+├── test_telemetry_registry.py # Conformance both ways + privacy walk + SDK-import check
 └── test_token_cache.py
 ```
 

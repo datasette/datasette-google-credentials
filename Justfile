@@ -91,6 +91,38 @@ dev *flags:
     --plugins-dir samples \
     {{flags}}
 
+# The viewer installs its own providers at import time, so no
+# `opentelemetry-instrument` or OTEL_* env vars here. It stays a `--with ../`
+# sibling path until it is on PyPI (same as datasette-cron). Rows land in
+# .tmp/otel.db.
+# Like `just dev`, plus datasette-otel-viewer: browse spans and metrics at /-/otel.
+dev-otel *flags:
+  mkdir -p .tmp
+  DATASETTE_SECRET=abc123 uv run \
+    --no-cache \
+    --with ../datasette-otel-viewer \
+    datasette \
+    -s permissions.google-auth-connect true \
+    -s permissions.google-auth-add-service-account true \
+    -s permissions.google-auth-admin true \
+    -s permissions.permissions-debug true \
+    -s permissions.datasette-otel-viewer true \
+    -s plugins.datasette-otel-viewer.db_path .tmp/otel.db \
+    -s plugins.datasette-otel-viewer.service_name datasette-google-auth \
+    --internal .tmp/internal.db \
+    -p 8021 \
+    --create .tmp/tmp.db \
+    --plugins-dir samples \
+    {{flags}}
+
+# Regenerate the OpenTelemetry reference in README.md from the registry.
+telemetry-doc:
+  uv run scripts/telemetry-doc.py
+
+# CI: fail if README's telemetry reference is stale.
+telemetry-doc-check:
+  uv run scripts/telemetry-doc.py --check
+
 dev-with-hmr *flags:
   watchexec --stop-signal SIGKILL -e py,html --ignore '*.db' --restart --clear -- \
     just dev -s plugins.datasette-vite.dev_ports.datasette_google_auth 5187 {{flags}}

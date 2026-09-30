@@ -308,6 +308,11 @@ class OAuthServer:
         principal = Principal(user.email, frozenset(scopes), sub=user.sub)
         return self._new_grant(client_id, principal).refresh_token
 
+    def refresh_tokens(self) -> list[str]:
+        """Every live grant's current refresh token (for leak checks)."""
+        with self._lock:
+            return list(self._grants)
+
     def is_revoked(self, refresh_token: str) -> bool:
         """True if revoked (directly or via one of its access tokens) or rotated away."""
         with self._lock:

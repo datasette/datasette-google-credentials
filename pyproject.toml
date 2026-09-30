@@ -22,6 +22,9 @@ dependencies = [
     "pyjwt[crypto]",
     "cryptography",
     "httpx2>=2.0",
+    # Declared explicitly (datasette 1.0a41 already brings it), as cron and
+    # agent do. The SDK is never imported by the package (D29).
+    "opentelemetry-api>=1.37",
 ]
 
 [dependency-groups]
@@ -29,6 +32,8 @@ dev = [
     "datasette-debug-gotham>=0.1.0a3",
     # Hosts the vendored mock Google server in tests (ticket 06).
     "fastapi",
+    # In-memory tracer/meter providers for the telemetry tests (ticket 20).
+    "opentelemetry-sdk>=1.37",
     "pytest",
     "pytest-asyncio",
     "ruff>=0.15.0",

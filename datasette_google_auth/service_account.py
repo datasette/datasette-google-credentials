@@ -52,6 +52,8 @@ from .permissions import (
     can_use_sa,
     seed_manager,
 )
+from .telemetry import google_call
+from .telemetry_registry import SCOPES_COUNT, TOKEN_MINT
 from .token_cache import get_token_cache
 from .tokens import Token
 
@@ -208,35 +210,38 @@ async def mint_token(
     """
     if not scopes:
         raise ValueError("mint_token needs at least one scope")
-    now = int(time.time())
-    assertion = build_assertion(key, scopes, audience=token_url, now=now)
-    try:
-        response = await http.post(
-            token_url, data={"grant_type": JWT_BEARER, "assertion": assertion}
-        )
-    except httpx2.HTTPError as ex:
-        # The exception text may include the request; the class name is enough.
-        raise GoogleTokenError(None, type(ex).__name__) from None
+    with google_call("mint", TOKEN_MINT) as call:
+        call.set(SCOPES_COUNT, len(scopes))
+        now = int(time.time())
+        assertion = build_assertion(key, scopes, audience=token_url, now=now)
+        try:
+            response = await http.post(
+                token_url, data={"grant_type": JWT_BEARER, "assertion": assertion}
+            )
+        except httpx2.HTTPError as ex:
+            # The exception text may include the request; the class name is enough.
+            raise GoogleTokenError(None, type(ex).__name__) from None
+        call.response(response)
 
-    if response.status_code != 200:
-        error, description = google_error(response)
-        if error == "invalid_grant":
-            raise CredentialBroken(description or "invalid_grant")
-        raise GoogleTokenError(response.status_code, error, description)
-    try:
-        body = response.json()
-    except ValueError:
-        body = None
-    access_token = body.get("access_token") if isinstance(body, dict) else None
-    if not isinstance(access_token, str) or not access_token:
-        raise GoogleTokenError(200, "invalid_response", "no access_token in reply")
-    expires_in = body.get("expires_in") if isinstance(body, dict) else None
-    return Token.from_expires_in(
-        access_token,
-        expires_in if isinstance(expires_in, (int, float)) else None,
-        scopes,
-        now=now,
-    )
+        if response.status_code != 200:
+            error, description = google_error(response)
+            if error == "invalid_grant":
+                raise CredentialBroken(description or "invalid_grant")
+            raise GoogleTokenError(response.status_code, error, description)
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        access_token = body.get("access_token") if isinstance(body, dict) else None
+        if not isinstance(access_token, str) or not access_token:
+            raise GoogleTokenError(200, "invalid_response", "no access_token in reply")
+        expires_in = body.get("expires_in") if isinstance(body, dict) else None
+        return Token.from_expires_in(
+            access_token,
+            expires_in if isinstance(expires_in, (int, float)) else None,
+            scopes,
+            now=now,
+        )
 
 
 async def mint_service_account_token(
