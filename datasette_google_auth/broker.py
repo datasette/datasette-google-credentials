@@ -77,14 +77,37 @@ Actor = dict[str, Any] | None
 # --- Scopes -----------------------------------------------------------------
 
 
+_AUTH = "https://www.googleapis.com/auth/"
+
+# D27: a granted scope also covers the narrower scopes Google accepts it for,
+# so consumers can ask for the narrowest scope they need (the importer asks
+# for spreadsheets.readonly) and still match a default, full-scope connect.
+# Deliberately small: only pairs Alex decided on, nothing transitive.
+SCOPE_IMPLIES: dict[str, frozenset[str]] = {
+    _AUTH + "spreadsheets": frozenset({_AUTH + "spreadsheets.readonly"}),
+    _AUTH + "drive": frozenset({_AUTH + "drive.readonly", _AUTH + "drive.file"}),
+    # Two spellings of the same scope.
+    "email": frozenset({_AUTH + "userinfo.email"}),
+    _AUTH + "userinfo.email": frozenset({"email"}),
+}
+
+
+def covered_scopes(granted: Iterable[str]) -> set[str]:
+    """``granted`` plus every scope it implies (``SCOPE_IMPLIES``)."""
+    covered = set(granted)
+    for scope in list(covered):
+        covered |= SCOPE_IMPLIES.get(scope, frozenset())
+    return covered
+
+
 def missing_scopes(requested: Iterable[str], granted: Iterable[str]) -> list[str]:
     """The requested scopes not covered by ``granted``, sorted.
 
-    Strict string matching for now: ``spreadsheets`` does NOT cover
-    ``spreadsheets.readonly``. Whether broader scopes imply narrower ones is
-    ticket 16's open decision; change it here only.
+    A granted scope covers itself and the narrower scopes in
+    ``SCOPE_IMPLIES`` (D27): ``spreadsheets`` covers
+    ``spreadsheets.readonly``, never the other way round.
     """
-    return sorted(set(requested) - set(granted))
+    return sorted(set(requested) - covered_scopes(granted))
 
 
 # --- Access -------------------------------------------------------------------
@@ -330,8 +353,8 @@ async def list_credentials(
     """The credentials ``actor`` may use: their own OAuth connections, then
     the service accounts shared with them, each oldest first.
 
-    With ``scopes``, OAuth credentials must have been granted all of them;
-    service accounts always qualify (they mint any scope, though the target
+    With ``scopes``, OAuth credentials must have been granted all of them
+    (or a broader scope that implies one, D27); service accounts always qualify (they mint any scope, though the target
     file must still be shared with them, which only a request can tell).
     Broken credentials are included, with their ``status``, so a picker can
     offer "Reconnect". Anonymous actors get ``[]``. ``google-auth-admin``

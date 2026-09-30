@@ -72,7 +72,8 @@ datasette_google_auth/
 └── routes/
     ├── pages.py             # Page routes (render HTML) + OAuth connect/callback redirects
     └── api.py               # JSON API (Pydantic in/out, OpenAPI); every GoogleAuthError → error_response
-samples/                     # Consumer sample plugins (importer, exporter)
+samples/                     # Consumer sample plugins: public API only (importer, exporter)
+└── google_sheets_import.py  # One-shot sheet → table import at /-/google-sheets-import/<db>
 tests/
 ├── conftest.py              # Imports shared fixtures; later tickets add theirs here
 ├── test_api.py
@@ -86,6 +87,7 @@ tests/
 ├── test_internal_db.py
 ├── test_lifecycle.py
 ├── test_permissions.py
+├── test_sample_importer.py  # Loads samples/ via plugins_dir; unregisters after
 ├── test_service_account.py
 ├── test_smoke.py
 └── test_token_cache.py
@@ -100,6 +102,12 @@ Planned per the house layout (D18): `page_data.py`,
 - `GET /-/google-auth/connect?return_to=/...` → start OAuth connect (404 without
   `client_id`/`client_secret`, 403 without `google-auth-connect`)
 - `GET /-/google-auth/oauth/callback` → OAuth redirect URI
+- Sample (only with `--plugins-dir samples`): `GET|POST /-/google-sheets-import/<db>`
+
+Scope matching (`broker.missing_scopes`) uses the D27 implication table
+(`SCOPE_IMPLIES`): `spreadsheets` covers `spreadsheets.readonly`, `drive` covers
+`drive.readonly` / `drive.file`, `email` = `userinfo.email`. Consumers should
+request the narrowest scope they need.
 
 JSON API (`routes/api.py`). Errors are `error_response()` JSON
 (`{ok: false, error, code, ...}`); ids the actor may not know about are 404.

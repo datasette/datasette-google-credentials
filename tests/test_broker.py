@@ -463,10 +463,25 @@ async def test_missing_scopes_has_reconnect_url(mock_google):
     # The configured scopes include it, so a plain reconnect asks again.
     assert excinfo.value.reconnect_url == "/-/google-auth/connect"
     assert excinfo.value.not_configured == []
-    # Strict matching: spreadsheets doesn't imply spreadsheets.readonly.
+    # D27: spreadsheets implies spreadsheets.readonly (not the reverse).
     full = await add_oauth(datasette, mock_google, user=SECOND_USER)
-    with pytest.raises(MissingScopes):
-        await get_credential(datasette, full.id, actor=ALICE, scopes=[SCOPE_SHEETS_RO])
+    cred = await get_credential(
+        datasette, full.id, actor=ALICE, scopes=[SCOPE_SHEETS_RO]
+    )
+    assert await cred.token()
+
+
+@pytest.mark.asyncio
+async def test_implied_scope_counts_as_configured(mock_google):
+    # Configured `spreadsheets` covers a spreadsheets.readonly request, so a
+    # readonly-less grant is fixable by reconnecting.
+    datasette = await make_datasette(mock_google)
+    row = await add_oauth(datasette, mock_google, scopes=[SCOPE_OPENID, SCOPE_EMAIL])
+    with pytest.raises(MissingScopes) as excinfo:
+        await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS_RO])
+    assert excinfo.value.missing == [SCOPE_SHEETS_RO]
+    assert excinfo.value.not_configured == []
+    assert excinfo.value.reconnect_url == "/-/google-auth/connect"
 
 
 @pytest.mark.asyncio
@@ -595,11 +610,15 @@ async def test_list_credentials(mock_google, service_account_keys):
         sa.id,
         other_sa.id,
     ]
+    # D27: the full-scope credential also qualifies for readonly.
+    assert ids(
+        await list_credentials(datasette, actor=ALICE, scopes=[SCOPE_SHEETS_RO])
+    ) == [readonly.id, full.id, sa.id, other_sa.id]
     assert ids(
         await list_credentials(
             datasette, actor=ALICE, scopes=[SCOPE_SHEETS_RO, SCOPE_SHEETS]
         )
-    ) == [sa.id, other_sa.id]
+    ) == [full.id, sa.id, other_sa.id]
     # google-auth-admin doesn't widen the list; anonymous gets nothing.
     assert await list_credentials(datasette, actor=ADMIN_ACTOR) == []
     assert await list_credentials(datasette, actor=None) == []
@@ -654,10 +673,35 @@ async def test_touch_used_is_throttled(mock_google, monkeypatch):
     assert len(writes) == 2
 
 
-def test_missing_scopes_is_strict():
-    assert missing_scopes([SCOPE_SHEETS], ALL_SCOPES) == []
-    assert missing_scopes([], []) == []
-    assert missing_scopes([SCOPE_SHEETS_RO], [SCOPE_SHEETS]) == [SCOPE_SHEETS_RO]
+AUTH = "https://www.googleapis.com/auth/"
+
+
+@pytest.mark.parametrize(
+    "requested,granted,missing",
+    [
+        ([SCOPE_SHEETS], ALL_SCOPES, []),
+        ([], [], []),
+        # D27 implication table: broader covers narrower...
+        ([SCOPE_SHEETS_RO], [SCOPE_SHEETS], []),
+        ([AUTH + "drive.readonly", AUTH + "drive.file"], [AUTH + "drive"], []),
+        ([AUTH + "userinfo.email"], [SCOPE_EMAIL], []),
+        ([SCOPE_EMAIL], [AUTH + "userinfo.email"], []),
+        # ...never the reverse, and nothing beyond the table.
+        ([SCOPE_SHEETS], [SCOPE_SHEETS_RO], [SCOPE_SHEETS]),
+        ([AUTH + "drive"], [AUTH + "drive.file"], [AUTH + "drive"]),
+        ([SCOPE_SHEETS_RO], [AUTH + "drive"], [SCOPE_SHEETS_RO]),
+        ([AUTH + "drive.file"], [AUTH + "drive.readonly"], [AUTH + "drive.file"]),
+        (
+            [AUTH + "spreadsheets.readonly.extra"],
+            [SCOPE_SHEETS],
+            [AUTH + "spreadsheets.readonly.extra"],
+        ),
+        # Sorted output.
+        ([SCOPE_SHEETS, SCOPE_EMAIL], [SCOPE_OPENID], [SCOPE_EMAIL, SCOPE_SHEETS]),
+    ],
+)
+def test_missing_scopes(requested, granted, missing):
+    assert missing_scopes(requested, granted) == missing
 
 
 # --- error_response -----------------------------------------------------------
