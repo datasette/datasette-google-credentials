@@ -1,7 +1,7 @@
 {
   "$defs": {
-    "ListedCredential": {
-      "description": "``CredentialInfo`` plus what the management page (ticket 14) needs to\ndecide which controls to show. Returned by ``GET /api/credentials``; the\nextra fields are additive, so each item still reads as a\n``CredentialInfo``. Never a secret, nor who else used or can use it.",
+    "AdminCredentialInfo": {
+      "description": "One credential as a ``google-auth-admin`` sees it in the \"All\ncredentials\" view (ticket 15): ``CredentialInfo`` plus who owns it and\nwho used it last. Information only: it never grants use (D6).",
       "properties": {
         "id": {
           "title": "Id",
@@ -52,25 +52,13 @@
           "title": "Is Owner",
           "type": "boolean"
         },
-        "role": {
-          "anyOf": [
-            {
-              "enum": ["User", "Editor", "Manager"],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Role"
+        "owner_id": {
+          "title": "Owner Id",
+          "type": "string"
         },
-        "can_edit": {
-          "title": "Can Edit",
-          "type": "boolean"
-        },
-        "can_manage": {
-          "title": "Can Manage",
-          "type": "boolean"
+        "created_by": {
+          "title": "Created By",
+          "type": "string"
         },
         "last_used_at": {
           "anyOf": [
@@ -83,12 +71,16 @@
           ],
           "title": "Last Used At"
         },
-        "missing_scopes": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Missing Scopes",
-          "type": "array"
+        "last_used_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Used By"
         }
       },
       "required": [
@@ -100,25 +92,12 @@
         "status",
         "status_detail",
         "is_owner",
-        "role",
-        "can_edit",
-        "can_manage",
+        "owner_id",
+        "created_by",
         "last_used_at",
-        "missing_scopes"
+        "last_used_by"
       ],
-      "title": "ListedCredential",
-      "type": "object"
-    },
-    "ShareDialog": {
-      "description": "Settings for ``<datasette-acl-share-dialog>`` on service accounts.",
-      "properties": {
-        "features": {
-          "title": "Features",
-          "type": "string"
-        }
-      },
-      "required": ["features"],
-      "title": "ShareDialog",
+      "title": "AdminCredentialInfo",
       "type": "object"
     },
     "StatusResponse": {
@@ -166,56 +145,31 @@
       "type": "object"
     }
   },
-  "description": "The ``/-/google-auth`` management page (ticket 14).",
+  "description": "The ``/-/google-auth/admin`` \"All credentials\" page (ticket 15).\nInformation only: nothing here lets the admin use a credential (D6).",
   "properties": {
     "status": {
       "$ref": "#/$defs/StatusResponse"
     },
     "credentials": {
       "items": {
-        "$ref": "#/$defs/ListedCredential"
+        "$ref": "#/$defs/AdminCredentialInfo"
       },
       "title": "Credentials",
       "type": "array"
     },
-    "actor_id": {
-      "title": "Actor Id",
+    "actor_names": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Actor Names",
+      "type": "object"
+    },
+    "manage_url": {
+      "title": "Manage Url",
       "type": "string"
-    },
-    "connect_url": {
-      "title": "Connect Url",
-      "type": "string"
-    },
-    "share": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ShareDialog"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "admin_url": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Admin Url"
     }
   },
-  "required": [
-    "status",
-    "credentials",
-    "actor_id",
-    "connect_url",
-    "share",
-    "admin_url"
-  ],
-  "title": "IndexPageData",
+  "required": ["status", "credentials", "actor_names", "manage_url"],
+  "title": "AdminPageData",
   "type": "object"
 }

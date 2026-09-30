@@ -7,7 +7,7 @@ JSON Schema, and ``just types-pagedata`` turns that into
 
 from pydantic import BaseModel
 
-from .models import ListedCredential
+from .models import AdminCredentialInfo, ListedCredential
 from .routes.api import StatusResponse
 
 
@@ -31,6 +31,25 @@ class IndexPageData(BaseModel):
     """Starts Connect Google (and Reconnect) and comes back to this page."""
     share: ShareDialog | None
     """None when datasette-acl-share's bundle isn't built: no Share buttons."""
+    admin_url: str | None
+    """The "All credentials" admin page, for ``google-auth-admin`` holders
+    only (None otherwise)."""
 
 
-__exports__ = [IndexPageData]
+class AdminPageData(BaseModel):
+    """The ``/-/google-auth/admin`` "All credentials" page (ticket 15).
+    Information only: nothing here lets the admin use a credential (D6)."""
+
+    status: StatusResponse
+    credentials: list[AdminCredentialInfo]
+    """The first render of ``GET /api/admin/credentials`` (unfiltered); the
+    page filters it in the browser and refetches it after a delete."""
+    actor_names: dict[str, str]
+    """Display names for actor ids (``actors_from_ids``); absent ids show as
+    themselves."""
+    manage_url: str
+    """The ``/-/google-auth`` management page, where admins manage their own
+    credentials."""
+
+
+__exports__ = [IndexPageData, AdminPageData]

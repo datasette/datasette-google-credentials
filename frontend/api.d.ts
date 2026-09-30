@@ -117,6 +117,10 @@ export interface paths {
             "application/json": {
               /** Credentials */
               credentials: components["schemas"]["AdminCredentialInfo"][];
+              /** Actor Names */
+              actor_names: {
+                [key: string]: string;
+              };
             };
           };
         };
@@ -397,6 +401,39 @@ export interface paths {
     trace?: never;
   };
   "/-/google-auth": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/-/google-auth/admin": {
     parameters: {
       query?: never;
       header?: never;

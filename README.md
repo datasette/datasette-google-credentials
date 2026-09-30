@@ -419,8 +419,10 @@ What the plugin protects:
   `payload_too_large`). A service-account key file is about 2.4 KB.
 
 What `google-auth-admin` can and can't do: it can list every credential with
-its owner and last use (`GET /-/google-auth/api/admin/credentials`), and
-delete any credential, which revokes an OAuth grant at Google. It **cannot**
+its owner and last use (the "All Google credentials" page at
+`/-/google-auth/admin`, linked from the management page, or
+`GET /-/google-auth/api/admin/credentials`), and delete any credential, which
+revokes an OAuth grant at Google. It **cannot**
 use, rename or rotate someone else's credential, share a service account, or
 see any secret. It is meant for offboarding and incidents.
 
@@ -654,7 +656,7 @@ The rest of the JSON API serves the management page:
 | Route | Does |
 | ----- | ---- |
 | `GET /-/google-auth/api/status` | Setup flags (encryption and OAuth configured, internal DB persistent, the redirect URI) and the actor's permissions |
-| `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` | Every credential with owner and last use (`google-auth-admin`) |
+| `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` | Every credential with owner and last use, plus `actor_names` (display names from `actors_from_ids`) (`google-auth-admin`) |
 | `POST /-/google-auth/api/service-accounts` `{label?, key_json}` | Add a service account; the response includes `share_with_email` |
 | `POST /-/google-auth/api/credentials/{id}/rename` `{label}` | Rename |
 | `POST /-/google-auth/api/credentials/{id}/rotate-key` `{key_json}` | Rotate a service account's key |

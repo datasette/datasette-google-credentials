@@ -20,27 +20,22 @@ export type Scopes = string[];
 export type Status = string;
 export type StatusDetail = string | null;
 export type IsOwner = boolean;
-export type Role = ("User" | "Editor" | "Manager") | null;
-export type CanEdit = boolean;
-export type CanManage = boolean;
+export type OwnerId = string;
+export type CreatedBy = string;
 export type LastUsedAt = string | null;
-export type MissingScopes = string[];
-export type Credentials = ListedCredential[];
-export type ActorId = string;
-export type ConnectUrl = string;
-export type Features = string;
-export type AdminUrl = string | null;
+export type LastUsedBy = string | null;
+export type Credentials = AdminCredentialInfo[];
+export type ManageUrl = string;
 
 /**
- * The ``/-/google-auth`` management page (ticket 14).
+ * The ``/-/google-auth/admin`` "All credentials" page (ticket 15).
+ * Information only: nothing here lets the admin use a credential (D6).
  */
-export interface IndexPageData {
+export interface AdminPageData {
   status: StatusResponse;
   credentials: Credentials;
-  actor_id: ActorId;
-  connect_url: ConnectUrl;
-  share: ShareDialog | null;
-  admin_url: AdminUrl;
+  actor_names: ActorNames;
+  manage_url: ManageUrl;
   [k: string]: unknown;
 }
 /**
@@ -57,12 +52,11 @@ export interface StatusResponse {
   [k: string]: unknown;
 }
 /**
- * ``CredentialInfo`` plus what the management page (ticket 14) needs to
- * decide which controls to show. Returned by ``GET /api/credentials``; the
- * extra fields are additive, so each item still reads as a
- * ``CredentialInfo``. Never a secret, nor who else used or can use it.
+ * One credential as a ``google-auth-admin`` sees it in the "All
+ * credentials" view (ticket 15): ``CredentialInfo`` plus who owns it and
+ * who used it last. Information only: it never grants use (D6).
  */
-export interface ListedCredential {
+export interface AdminCredentialInfo {
   id: Id;
   type: Type;
   label: Label;
@@ -71,17 +65,12 @@ export interface ListedCredential {
   status: Status;
   status_detail: StatusDetail;
   is_owner: IsOwner;
-  role: Role;
-  can_edit: CanEdit;
-  can_manage: CanManage;
+  owner_id: OwnerId;
+  created_by: CreatedBy;
   last_used_at: LastUsedAt;
-  missing_scopes: MissingScopes;
+  last_used_by: LastUsedBy;
   [k: string]: unknown;
 }
-/**
- * Settings for ``<datasette-acl-share-dialog>`` on service accounts.
- */
-export interface ShareDialog {
-  features: Features;
-  [k: string]: unknown;
+export interface ActorNames {
+  [k: string]: string;
 }

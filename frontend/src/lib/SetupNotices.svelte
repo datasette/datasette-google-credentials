@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { StatusResponse } from "../../page_data/IndexPageData.types.ts";
-  import CopyButton from "../../lib/CopyButton.svelte";
+  import type { StatusResponse } from "../page_data/IndexPageData.types.ts";
+  import CopyButton from "./CopyButton.svelte";
 
   /**
    * Setup notices, shown only when something is missing. The fixes (config

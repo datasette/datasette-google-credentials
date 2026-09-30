@@ -1,23 +1,37 @@
 <script lang="ts">
-  import type { paths } from "../../../api.d.ts";
-  import { api, client } from "../../lib/api.ts";
-  import Modal from "../../lib/Modal.svelte";
-  import type { Credential } from "./types.ts";
+  import type { paths } from "../../api.d.ts";
+  import { api, client } from "./api.ts";
+  import Modal from "./Modal.svelte";
 
   type DeleteResult =
     paths["/-/google-auth/api/credentials/{credential_id}/delete"]["post"]["responses"][200]["content"]["application/json"];
 
+  /** What the dialog needs of a credential (a `ListedCredential` or an `AdminCredentialInfo`). */
+  type DeletableCredential = {
+    id: string;
+    type: string;
+    label: string;
+    google_email: string | null;
+  };
+
   /**
    * Disconnect (OAuth) or delete (service account): confirm, then report
    * what happened at Google (D16): whether the refresh token was revoked,
-   * or which key to delete in the Cloud console.
+   * or which key to delete in the Cloud console. Used by the management
+   * page for your own credentials and by the admin page for anyone's.
    */
   let {
     credential,
+    owner = null,
     onclose,
     ondeleted,
   }: {
-    credential: Credential | null;
+    credential: DeletableCredential | null;
+    /**
+     * Set when an admin deletes someone else's credential: the owner's
+     * display name, for wording that doesn't assume it's yours.
+     */
+    owner?: string | null;
     onclose: () => void;
     ondeleted: () => void;
   } = $props();
@@ -27,13 +41,18 @@
   let result = $state<DeleteResult | null>(null);
 
   const isOAuth = $derived(credential?.type === "google_oauth");
+  // An admin removing someone else's connection deletes it; "disconnect"
+  // is what owners do to their own.
+  const disconnect = $derived(isOAuth && !owner);
   const title = $derived(
     result
-      ? isOAuth
+      ? disconnect
         ? "Disconnected"
         : "Deleted"
       : isOAuth
-        ? "Disconnect Google account"
+        ? disconnect
+          ? "Disconnect Google account"
+          : "Delete Google account connection"
         : "Delete service account",
   );
 
@@ -67,18 +86,20 @@
     {#if isOAuth}
       {#if result.revoked}
         <p>
-          <strong>{credential.label}</strong> is disconnected and Google confirmed
-          that Datasette's access is revoked.
+          <strong>{credential.label}</strong> is {disconnect
+            ? "disconnected"
+            : "deleted"} and Google confirmed that Datasette's access is revoked.
         </p>
       {:else}
         <p>
-          <strong>{credential.label}</strong> is disconnected from Datasette,
-          but Google didn't confirm revoking its access{result.revoke_error
+          <strong>{credential.label}</strong> is {disconnect
+            ? "disconnected from"
+            : "deleted from"} Datasette, but Google didn't confirm revoking its access{result.revoke_error
             ? ` (${result.revoke_error})`
             : ""}.
         </p>
         <p>
-          To be sure, remove Datasette's access at
+          To be sure, {owner ? `ask ${owner} to` : ""} remove Datasette's access at
           <a
             href="https://myaccount.google.com/linkedapps"
             target="_blank"
@@ -109,7 +130,13 @@
       </p>
     {/if}
   {:else if credential}
-    {#if isOAuth}
+    {#if isOAuth && owner}
+      <p>
+        Delete <strong>{credential.label}</strong>, the Google account {owner}
+        connected? Datasette asks Google to revoke its access, then deletes it. Anything
+        {owner} uses it for stops working until they connect it again.
+      </p>
+    {:else if isOAuth}
       <p>
         Disconnect <strong>{credential.label}</strong>? Datasette asks Google to
         revoke its access, then forgets it. Anything using it stops working; you
@@ -147,7 +174,7 @@
         disabled={busy}
         onclick={confirm}
       >
-        {busy ? "Working…" : isOAuth ? "Disconnect" : "Delete"}
+        {busy ? "Working…" : disconnect ? "Disconnect" : "Delete"}
       </button>
     {/if}
   {/snippet}

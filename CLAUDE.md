@@ -86,6 +86,7 @@ frontend/
 ├── vite.config.ts           # Entries: index, admin; builds into datasette_google_auth/
 └── src/
     ├── lib/api.ts           # Typed openapi-fetch `client` + `api()` result normalizer
+    ├── lib/DeleteDialog.svelte, SetupNotices.svelte, page.css  # Shared by the index and admin pages
     ├── lib/datasette-modal.d.ts  # Types for core's global DatasetteModal (use it for dialogs)
     ├── page_data/           # load.ts + generated <Model>_schema.json / .types.ts (committed)
     └── pages/{index,admin}/ # index.ts mounts <Name>Page.svelte into #app-root
@@ -146,7 +147,8 @@ POSTs need no CSRF token (Datasette checks `Sec-Fetch-Site`/`Origin`).
 - `GET /-/google-auth/api/status` → setup-notice flags + permissions (any actor)
 - `GET /-/google-auth/api/credentials?scopes=a,b` → `{credentials: ListedCredential[]}`, mirrors `list_credentials()`;
   each item is a `CredentialInfo` plus the page's `role`, `can_edit`, `can_manage`, `last_used_at`, `missing_scopes`
-- `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` → `{credentials: AdminCredentialInfo[]}` (`google-auth-admin`, info only)
+- `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` → `{credentials: AdminCredentialInfo[], actor_names}`
+  (`google-auth-admin`, info only; `actor_names` = display names via core `actors_from_ids`, ids without one omitted)
 - `POST /-/google-auth/api/service-accounts` `{label?, key_json}` → CredentialInfo + `share_with_email`
 - `POST /-/google-auth/api/credentials/{id}/rename` `{label}` → CredentialInfo
 - `POST /-/google-auth/api/credentials/{id}/rotate-key` `{key_json}` → CredentialInfo
@@ -156,7 +158,10 @@ Pages (`routes/pages.py`, rendered by `render_page()`):
 - `GET /-/google-auth` → management page (403 for anonymous; any signed-in actor, who may have
   shared service accounts). Svelte app in `frontend/src/pages/index/`; dialogs use `lib/Modal.svelte`
   (core `DatasetteModal`). Connect/Reconnect link to `/-/google-auth/connect?return_to=/-/google-auth`;
-  the callback reports back through Datasette flash messages.
+  the callback reports back through Datasette flash messages. Links admins to the admin page.
+- `GET /-/google-auth/admin` → "All Google credentials" (403 unless `google-auth-admin`). Svelte app in
+  `frontend/src/pages/admin/`: filters (in the browser, mirrored to `?owner=&type=&status=`) and Delete only;
+  never use, rename or reconnect. No menu link (reached from the management page).
 
 ## Hooks Used
 

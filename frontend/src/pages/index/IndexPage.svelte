@@ -3,12 +3,12 @@
   import type { IndexPageData } from "../../page_data/IndexPageData.types.ts";
   import { loadPageData } from "../../page_data/load.ts";
   import AddServiceAccountDialog from "./AddServiceAccountDialog.svelte";
-  import DeleteDialog from "./DeleteDialog.svelte";
+  import DeleteDialog from "../../lib/DeleteDialog.svelte";
   import GoogleAccounts from "./GoogleAccounts.svelte";
   import RenameDialog from "./RenameDialog.svelte";
   import RotateKeyDialog from "./RotateKeyDialog.svelte";
   import ServiceAccounts from "./ServiceAccounts.svelte";
-  import SetupNotices from "./SetupNotices.svelte";
+  import SetupNotices from "../../lib/SetupNotices.svelte";
   import type { Credential, Notice } from "./types.ts";
 
   // After Connect Google, the callback's result arrives as a Datasette flash
@@ -61,6 +61,13 @@
 
 <div class="google-auth-page">
   <h1>Google accounts</h1>
+
+  {#if pageData.admin_url}
+    <p class="small">
+      As an admin, you can also
+      <a href={pageData.admin_url}>see and delete everyone's credentials</a>.
+    </p>
+  {/if}
 
   <SetupNotices {status} />
 

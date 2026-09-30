@@ -28,7 +28,7 @@ from datasette import Response
 from datasette_plugin_router import Body
 from pydantic import BaseModel, ConfigDict, SecretStr
 
-from ..admin import list_all_credentials
+from ..admin import actor_ids, actor_names, list_all_credentials
 from ..config import encryption_configured, get_config, oauth_configured
 from ..errors import GoogleAuthError, error_response
 from ..models import (
@@ -60,6 +60,10 @@ class CredentialListResponse(BaseModel):
 
 class AdminCredentialListResponse(BaseModel):
     credentials: list[AdminCredentialInfo]
+    actor_names: dict[str, str]
+    """Display names for the owner / created-by / last-used-by ids, from
+    ``datasette.actors_from_ids()``. Ids without a name are absent: show the
+    id."""
 
 
 class ServiceAccountCreated(CredentialInfo):
@@ -161,6 +165,25 @@ async def get_status(datasette, request) -> StatusResponse:
     )
 
 
+async def get_admin_credentials(
+    datasette,
+    request,
+    *,
+    owner: str | None = None,
+    type: str | None = None,
+    status: str | None = None,
+) -> AdminCredentialListResponse:
+    """The ``/api/admin/credentials`` listing; also the admin page's data.
+    Raises ``CredentialForbidden`` unless the actor holds ``google-auth-admin``."""
+    credentials = await list_all_credentials(
+        datasette, request.actor, owner=owner, type=type, status=status
+    )
+    return AdminCredentialListResponse(
+        credentials=credentials,
+        actor_names=await actor_names(datasette, actor_ids(credentials)),
+    )
+
+
 # --- Routes -------------------------------------------------------------------
 
 
@@ -190,18 +213,16 @@ async def api_credentials(datasette, request):
 )
 async def api_admin_credentials(datasette, request):
     try:
-        credentials = await list_all_credentials(
+        listing = await get_admin_credentials(
             datasette,
-            request.actor,
+            request,
             owner=request.args.get("owner") or None,
             type=request.args.get("type") or None,
             status=request.args.get("status") or None,
         )
     except GoogleAuthError as ex:
         return error_response(ex)
-    return Response.json(
-        AdminCredentialListResponse(credentials=credentials).model_dump()
-    )
+    return Response.json(listing.model_dump())
 
 
 @router.POST(r"/-/google-auth/api/service-accounts$", output=ServiceAccountCreated)

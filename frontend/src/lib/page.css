@@ -1,4 +1,4 @@
-/* Shared by the management page's section components (scoped under the
+/* Shared by the management and admin pages (scoped under the
    page root so nothing leaks into Datasette's own chrome). */
 
 .google-auth-page {

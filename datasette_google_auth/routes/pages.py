@@ -2,7 +2,9 @@
 
 Pages render ``google_auth_base.html`` with a Vite ``entrypoint`` and a
 ``page_data`` model from ``page_data.py``. ``index`` is the management page
-(ticket 14); its Svelte app is ``frontend/src/pages/index/``. The OAuth routes are browser
+(ticket 14); its Svelte app is ``frontend/src/pages/index/``. ``admin`` is
+the ``google-auth-admin`` "All credentials" view (ticket 15,
+``frontend/src/pages/admin/``). The OAuth routes are browser
 redirects, not API calls, so they live here rather than under ``/api``; the
 flow itself is in ``oauth.py``, which turns the errors it expects into error
 pages. The ``GoogleAuthError`` catch here is a backstop: none may escape to
@@ -14,11 +16,14 @@ from pydantic import BaseModel
 
 from ..errors import GoogleAuthError, error_response
 from ..oauth import DEFAULT_RETURN_TO, connect_url, finish_connect, start_connect
-from ..page_data import IndexPageData, ShareDialog
+from ..page_data import AdminPageData, IndexPageData, ShareDialog
 from ..router import router
 from ..service import list_with_access
 from ..sharing import share_assets, share_features
-from .api import get_status
+from .api import get_admin_credentials, get_status
+
+MANAGE_PATH = "/-/google-auth"
+ADMIN_PATH = "/-/google-auth/admin"
 
 
 async def render_page(
@@ -67,6 +72,39 @@ async def index(datasette, request):
             share=ShareDialog(features=share_features())
             if share_assets(datasette) is not None
             else None,
+            admin_url=datasette.urls.path(ADMIN_PATH) if status.is_admin else None,
+        ),
+    )
+
+
+@router.GET(r"/-/google-auth/admin$")
+async def admin(datasette, request):
+    """Every credential, for ``google-auth-admin`` holders only (403 for
+    everyone else, anonymous included). List and delete; never use, rename
+    or reconnect someone else's credential (D6, D26)."""
+    actor = request.actor
+    if not actor or actor.get("id") is None:
+        raise Forbidden("Sign in to see all Google credentials")
+    try:
+        status = await get_status(datasette, request)
+    except GoogleAuthError as ex:
+        return error_response(ex)
+    if not status.is_admin:
+        raise Forbidden("You don't have permission to see all Google credentials")
+    try:
+        listing = await get_admin_credentials(datasette, request)
+    except GoogleAuthError as ex:
+        return error_response(ex)
+    return await render_page(
+        datasette,
+        request,
+        title="All Google credentials",
+        entrypoint="src/pages/admin/index.ts",
+        page_data=AdminPageData(
+            status=status,
+            credentials=listing.credentials,
+            actor_names=listing.actor_names,
+            manage_url=datasette.urls.path(MANAGE_PATH),
         ),
     )
 
