@@ -19,8 +19,8 @@ from mock_google.oauth import (
     s256,
 )
 
-from datasette_google_auth import http
-from datasette_google_auth.config import get_config
+from datasette_google_credentials import http
+from datasette_google_credentials.config import get_config
 
 VERIFIER = "v" * 43 + "-._~0123456789"
 SCOPES = f"openid email {SCOPE_SHEETS}"

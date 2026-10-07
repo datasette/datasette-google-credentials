@@ -296,7 +296,7 @@ async def add_service_account(
 ) -> CredentialInfo:
     """Validate, live-test, encrypt and store a service-account key.
 
-    The actor needs ``google-auth-add-service-account`` and becomes the
+    The actor needs ``google-credentials-add-service-account`` and becomes the
     owner and Manager. ``label`` defaults to the key's ``client_email``.
 
     Raises ``CredentialForbidden``, ``EncryptionNotConfigured``,

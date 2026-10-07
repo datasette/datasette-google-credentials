@@ -3,14 +3,14 @@ import asyncio
 import pytest
 from datasette.app import Datasette
 
-from datasette_google_auth.internal_db import CredentialRow
-from datasette_google_auth.token_cache import (
+from datasette_google_credentials.internal_db import CredentialRow
+from datasette_google_credentials.token_cache import (
     EXPIRY_SKEW,
     CacheKey,
     TokenCache,
     get_token_cache,
 )
-from datasette_google_auth.tokens import DEFAULT_TOKEN_LIFETIME, Token
+from datasette_google_credentials.tokens import DEFAULT_TOKEN_LIFETIME, Token
 
 READ = frozenset({"https://www.googleapis.com/auth/spreadsheets.readonly"})
 WRITE = frozenset({"https://www.googleapis.com/auth/spreadsheets"})

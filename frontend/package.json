@@ -1,5 +1,5 @@
 {
-  "name": "datasette-google-auth-frontend",
+  "name": "datasette-google-credentials-frontend",
   "private": true,
   "type": "module",
   "scripts": {

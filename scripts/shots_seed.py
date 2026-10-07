@@ -26,11 +26,11 @@ from datasette import hookimpl
 from datasette_acl import startup as acl_startup
 from datasette_acl.grants import Principal, grant
 
-from datasette_google_auth import startup as google_auth_startup
-from datasette_google_auth.broker import SA_BROKEN_DETAIL
-from datasette_google_auth.internal_db import TABLE
-from datasette_google_auth.oauth import BROKEN_DETAIL
-from datasette_google_auth.permissions import RESOURCE_TYPE, seed_manager
+from datasette_google_credentials import startup as google_credentials_startup
+from datasette_google_credentials.broker import SA_BROKEN_DETAIL
+from datasette_google_credentials.internal_db import TABLE
+from datasette_google_credentials.oauth import BROKEN_DETAIL
+from datasette_google_credentials.permissions import RESOURCE_TYPE, seed_manager
 
 HEADER = "x-shots-actor"
 
@@ -151,10 +151,10 @@ def startup(datasette):
         if not (datasette.plugin_config("shots_seed") or {}).get("seed"):
             return
         # Startup hooks run in no guaranteed order: run datasette-acl's and
-        # google-auth's first (both idempotent) so their tables exist and
+        # google-credentials's first (both idempotent) so their tables exist and
         # acl knows every action before the grants below.
         await acl_startup(datasette)()
-        await google_auth_startup(datasette)()
+        await google_credentials_startup(datasette)()
         await seed(datasette)
 
     return inner

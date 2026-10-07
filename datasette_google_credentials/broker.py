@@ -16,7 +16,7 @@ Access rules:
 * Anyone who can't use a credential and couldn't see it either gets
   ``CredentialNotFound``, exactly as for an id that doesn't exist (no ID
   probing). ``CredentialForbidden`` is only for actors who can see it but not
-  use it: in v0, a ``google-auth-admin`` looking at someone else's credential.
+  use it: in v0, a ``google-credentials-admin`` looking at someone else's credential.
 
 Revocation is immediate (D16): ``get_credential`` re-reads the row and
 re-checks access, and so does **every** ``Credential.token()`` (and so
@@ -74,7 +74,7 @@ SA_BROKEN_DETAIL = (
 # process: token() runs on every request() and must not hammer internal.db.
 TOUCH_INTERVAL = 60.0
 
-_TOUCH_ATTR = "_google_auth_touch_throttle"
+_TOUCH_ATTR = "_google_credentials_touch_throttle"
 
 Actor = dict[str, Any] | None
 
@@ -457,7 +457,7 @@ async def list_credentials(
     (or a broader scope that implies one, D27); service accounts always qualify (they mint any scope, though the target
     file must still be shared with them, which only a request can tell).
     Broken credentials are included, with their ``status``, so a picker can
-    offer "Reconnect". Anonymous actors get ``[]``. ``google-auth-admin``
+    offer "Reconnect". Anonymous actors get ``[]``. ``google-credentials-admin``
     doesn't widen this list.
     """
     actor_id = _actor_id(actor)

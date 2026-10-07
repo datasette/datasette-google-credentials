@@ -4,8 +4,8 @@ Run with `just test-live`. `just test` never collects this directory
 (`norecursedirs` in pyproject.toml), and without both environment variables
 every test here is skipped, with a line saying which one is missing:
 
-    DATASETTE_GOOGLE_AUTH_LIVE_SA_KEY   path to a service-account JSON key file
-    DATASETTE_GOOGLE_AUTH_LIVE_SHEET    URL or ID of a spreadsheet shared with
+    DATASETTE_GOOGLE_CREDENTIALS_LIVE_SA_KEY   path to a service-account JSON key file
+    DATASETTE_GOOGLE_CREDENTIALS_LIVE_SHEET    URL or ID of a spreadsheet shared with
                                         that key's client_email as Editor
 
 The key is read from the file, never from the environment itself, and never
@@ -32,10 +32,10 @@ from cryptography.fernet import Fernet
 from datasette.app import Datasette
 from live_support import ALICE, KEY_ENV, SHEET_ENV, SecretText, spreadsheet_id
 
-from datasette_google_auth import CredentialNotFound
-from datasette_google_auth.permissions import ADD_SERVICE_ACCOUNT
-from datasette_google_auth.service import delete
-from datasette_google_auth.service_account import add_service_account
+from datasette_google_credentials import CredentialNotFound
+from datasette_google_credentials.permissions import ADD_SERVICE_ACCOUNT
+from datasette_google_credentials.service import delete
+from datasette_google_credentials.service_account import add_service_account
 
 HERE = pathlib.Path(__file__).resolve().parent
 
@@ -154,7 +154,7 @@ async def datasette() -> Datasette:
         memory=True,
         config={
             "plugins": {
-                "datasette-google-auth": {
+                "datasette-google-credentials": {
                     "encryption-key": Fernet.generate_key().decode(),
                 },
             },

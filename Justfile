@@ -37,7 +37,7 @@ shots *names:
 # Print the JSON API's OpenAPI document (from the router's Pydantic models).
 # Importing the router imports the package, which registers every route.
 openapi:
-  @uv run python -c 'from datasette_google_auth.router import router; import json; print(json.dumps(router.openapi_document_json(), indent=2))'
+  @uv run python -c 'from datasette_google_credentials.router import router; import json; print(json.dumps(router.openapi_document_json(), indent=2))'
 
 types-routes:
   just openapi | npx --prefix frontend openapi-typescript > frontend/api.d.ts
@@ -87,8 +87,8 @@ test *flags:
   uv run pytest {{flags}}
 
 # Opt-in tests against real Google with a service-account key; Alex runs them,
-# never CI. Skips everything, saying why, unless DATASETTE_GOOGLE_AUTH_LIVE_SA_KEY
-# (path to a key file) and DATASETTE_GOOGLE_AUTH_LIVE_SHEET are set. Setup and the
+# never CI. Skips everything, saying why, unless DATASETTE_GOOGLE_CREDENTIALS_LIVE_SA_KEY
+# (path to a key file) and DATASETTE_GOOGLE_CREDENTIALS_LIVE_SHEET are set. Setup and the
 # manual OAuth checklist: tests/live/SETUP.md, tests/live/OAUTH_CHECKLIST.md.
 test-live *flags:
   uv run pytest tests/live -rs --tb=short {{flags}}
@@ -98,9 +98,9 @@ test-live *flags:
 dev *flags:
   mkdir -p .tmp
   DATASETTE_SECRET=abc123 uv run datasette \
-    -s permissions.google-auth-connect true \
-    -s permissions.google-auth-add-service-account true \
-    -s permissions.google-auth-admin true \
+    -s permissions.google-credentials-connect true \
+    -s permissions.google-credentials-add-service-account true \
+    -s permissions.google-credentials-admin true \
     -s permissions.permissions-debug true \
     --internal .tmp/internal.db \
     -p 8021 \
@@ -119,13 +119,13 @@ dev-otel *flags:
     --no-cache \
     --with ../datasette-otel-viewer \
     datasette \
-    -s permissions.google-auth-connect true \
-    -s permissions.google-auth-add-service-account true \
-    -s permissions.google-auth-admin true \
+    -s permissions.google-credentials-connect true \
+    -s permissions.google-credentials-add-service-account true \
+    -s permissions.google-credentials-admin true \
     -s permissions.permissions-debug true \
     -s permissions.datasette-otel-viewer true \
     -s plugins.datasette-otel-viewer.db_path .tmp/otel.db \
-    -s plugins.datasette-otel-viewer.service_name datasette-google-auth \
+    -s plugins.datasette-otel-viewer.service_name datasette-google-credentials \
     --internal .tmp/internal.db \
     -p 8021 \
     --create .tmp/tmp.db \
@@ -142,7 +142,7 @@ telemetry-doc-check:
 
 dev-with-hmr *flags:
   watchexec --stop-signal SIGKILL -e py,html --ignore '*.db' --restart --clear -- \
-    just dev -s plugins.datasette-vite.dev_ports.datasette_google_auth 5187 {{flags}}
+    just dev -s plugins.datasette-vite.dev_ports.datasette_google_credentials 5187 {{flags}}
 
 clean-dev:
   rm -rf .tmp/

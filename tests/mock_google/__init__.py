@@ -1,4 +1,4 @@
-"""In-process mock of the Google endpoints datasette-google-auth talks to.
+"""In-process mock of the Google endpoints datasette-google-credentials talks to.
 
 Served by FastAPI and mounted with ``httpx2.ASGITransport`` (see
 ``tests/fixtures_google.py``): no uvicorn, no ports, no network.

@@ -1,4 +1,4 @@
-"""The ``google-auth-admin`` "All credentials" view (ticket 15, D6).
+"""The ``google-credentials-admin`` "All credentials" view (ticket 15, D6).
 
 The admin may list and delete anyone's credentials, never use them. Page
 access, page data, owner display names (``actors_from_ids``), delete
@@ -18,19 +18,19 @@ from datasette import hookimpl
 from datasette.plugins import pm
 from mock_google.oauth import SCOPE_EMAIL, SCOPE_OPENID, SCOPE_SHEETS
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialForbidden,
     get_credential,
     list_credentials,
 )
-from datasette_google_auth.crypto import encrypt_secret
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.page_data import AdminPageData, IndexPageData
-from datasette_google_auth.permissions import ADD_SERVICE_ACCOUNT, ADMIN, CONNECT
-from datasette_google_auth.service import add_service_account
+from datasette_google_credentials.crypto import encrypt_secret
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.page_data import AdminPageData, IndexPageData
+from datasette_google_credentials.permissions import ADD_SERVICE_ACCOUNT, ADMIN, CONNECT
+from datasette_google_credentials.service import add_service_account
 
-PAGE = "/-/google-auth/admin"
-API = "/-/google-auth/api/admin/credentials"
+PAGE = "/-/google-credentials/admin"
+API = "/-/google-credentials/api/admin/credentials"
 DEV_PORT = 5187
 SHARE_DEV_PORT = 5199
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
@@ -40,7 +40,7 @@ ADMIN_PAGE_SOURCE = (
 
 ALICE = {"id": "alice"}  # connect + add service account
 BOB = {"id": "bob"}  # connect only
-DAVE = {"id": "dave"}  # no google-auth action at all
+DAVE = {"id": "dave"}  # no google-credentials action at all
 ADMIN_ACTOR = {"id": "admin"}
 
 SECRET_WORDS = ('private_key"', "refresh_token", "secret", "BEGIN PRIVATE KEY")
@@ -59,7 +59,7 @@ async def make_datasette(mock_google):
             "plugins": {
                 "datasette-vite": {
                     "dev_ports": {
-                        "datasette_google_auth": DEV_PORT,
+                        "datasette_google_credentials": DEV_PORT,
                         "datasette_acl_share": SHARE_DEV_PORT,
                     }
                 }
@@ -184,7 +184,7 @@ async def test_admin_page_lists_every_credential(mock_google, service_account_ke
     assert f"http://localhost:{DEV_PORT}/src/pages/admin/index.ts" in response.text
     data = AdminPageData.model_validate(page_data_json(response.text))
     assert data.status.is_admin
-    assert data.manage_url == "/-/google-auth"
+    assert data.manage_url == "/-/google-credentials"
     rows = [(c.id, c.type, c.owner_id, c.status, c.is_owner) for c in data.credentials]
     assert rows == [
         (alice.id, "google_oauth", "alice", "ok", False),
@@ -212,7 +212,7 @@ async def test_page_data_offers_nothing_to_use_or_reconnect(mock_google):
     assert set(data) == set(AdminPageData.model_fields)
     # No connect/reconnect URL, no per-row permissions to act on.
     assert "connect_url" not in data
-    assert "/-/google-auth/connect" not in json.dumps(data)
+    assert "/-/google-credentials/connect" not in json.dumps(data)
     for row in data["credentials"]:
         assert not {"can_edit", "can_manage", "role"} & set(row)
 
@@ -228,7 +228,7 @@ def test_admin_page_offers_no_use_rename_or_reconnect():
 @pytest.mark.parametrize("actor,expected", [(ADMIN_ACTOR, True), (ALICE, False)])
 async def test_management_page_links_admins_to_admin_page(mock_google, actor, expected):
     datasette = await make_datasette(mock_google)
-    response = await datasette.client.get("/-/google-auth", actor=actor)
+    response = await datasette.client.get("/-/google-credentials", actor=actor)
     data = IndexPageData.model_validate(page_data_json(response.text))
     assert data.admin_url == (PAGE if expected else None)
 
@@ -307,7 +307,7 @@ async def test_admin_delete_revokes_at_google(mock_google):
     datasette = await make_datasette(mock_google)
     row, refresh_token = await add_oauth(datasette, mock_google, owner="bob")
     response = await datasette.client.post(
-        f"/-/google-auth/api/credentials/{row.id}/delete",
+        f"/-/google-credentials/api/credentials/{row.id}/delete",
         actor=ADMIN_ACTOR,
         headers={"Sec-Fetch-Site": "same-origin"},
     )
@@ -342,12 +342,12 @@ async def test_admin_can_never_use_others_credentials(
     # The admin listing doesn't widen the consumer listing.
     assert await list_credentials(datasette, actor=ADMIN_ACTOR) == []
     consumer = await datasette.client.get(
-        "/-/google-auth/api/credentials", actor=ADMIN_ACTOR
+        "/-/google-credentials/api/credentials", actor=ADMIN_ACTOR
     )
     assert consumer.json()["credentials"] == []
     # And the admin can't rename someone else's credential either (D26).
     rename = await datasette.client.post(
-        f"/-/google-auth/api/credentials/{oauth.id}/rename",
+        f"/-/google-credentials/api/credentials/{oauth.id}/rename",
         json={"label": "mine now"},
         actor=ADMIN_ACTOR,
         headers={"Sec-Fetch-Site": "same-origin"},

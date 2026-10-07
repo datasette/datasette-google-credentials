@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 EXPIRY_SKEW = 60.0
 DEFAULT_MAX_ENTRIES = 1000
 
-_ATTR = "_google_auth_tokens"
+_ATTR = "_google_credentials_tokens"
 
 
 @dataclass(frozen=True)

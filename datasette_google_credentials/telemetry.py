@@ -1,5 +1,5 @@
 """
-OpenTelemetry integration for datasette-google-auth (D29).
+OpenTelemetry integration for datasette-google-credentials (D29).
 
 Like Datasette core, this plugin depends on ``opentelemetry-api`` only. It
 never creates a ``TracerProvider`` or ``MeterProvider``, never configures an
@@ -9,7 +9,7 @@ and every instrument a no-op proxy, so an instrumented call costs one
 ``perf_counter()`` pair; attribute work is skipped behind
 ``span.is_recording()``.
 
-The tracer and meter live under their own ``datasette_google_auth`` scope,
+The tracer and meter live under their own ``datasette_google_credentials`` scope,
 versioned with the plugin. Context propagates through contextvars, so these
 spans nest inside core's request spans (and core's ``db.query`` spans nest
 inside ours).
@@ -67,13 +67,13 @@ from .telemetry_registry import (
     SERVER_ADDRESS,
 )
 
-__version__ = version("datasette-google-auth")
+__version__ = version("datasette-google-credentials")
 
 tracer = otel_trace.get_tracer(
-    "datasette_google_auth", __version__, schema_url=SCHEMA_URL
+    "datasette_google_credentials", __version__, schema_url=SCHEMA_URL
 )
 meter = otel_metrics.get_meter(
-    "datasette_google_auth", __version__, schema_url=SCHEMA_URL
+    "datasette_google_credentials", __version__, schema_url=SCHEMA_URL
 )
 
 # Module-level instruments are safe before any provider exists: proxy

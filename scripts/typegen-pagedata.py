@@ -4,7 +4,7 @@
 import json
 from pathlib import Path
 
-from datasette_google_auth.page_data import __exports__
+from datasette_google_credentials.page_data import __exports__
 
 for model in __exports__:
     out = Path("frontend/src/page_data") / f"{model.__name__}_schema.json"

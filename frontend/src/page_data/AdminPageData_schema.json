@@ -1,7 +1,7 @@
 {
   "$defs": {
     "AdminCredentialInfo": {
-      "description": "One credential as a ``google-auth-admin`` sees it in the \"All\ncredentials\" view (ticket 15): ``CredentialInfo`` plus who owns it and\nwho used it last. Information only: it never grants use (D6).",
+      "description": "One credential as a ``google-credentials-admin`` sees it in the \"All\ncredentials\" view (ticket 15): ``CredentialInfo`` plus who owns it and\nwho used it last. Information only: it never grants use (D6).",
       "properties": {
         "id": {
           "title": "Id",
@@ -145,7 +145,7 @@
       "type": "object"
     }
   },
-  "description": "The ``/-/google-auth/admin`` \"All credentials\" page (ticket 15).\nInformation only: nothing here lets the admin use a credential (D6).",
+  "description": "The ``/-/google-credentials/admin`` \"All credentials\" page (ticket 15).\nInformation only: nothing here lets the admin use a credential (D6).",
   "properties": {
     "status": {
       "$ref": "#/$defs/StatusResponse"

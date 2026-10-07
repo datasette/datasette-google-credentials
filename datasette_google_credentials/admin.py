@@ -1,4 +1,4 @@
-"""The ``google-auth-admin`` view of every credential (D6, D13, ticket 15).
+"""The ``google-credentials-admin`` view of every credential (D6, D13, ticket 15).
 
 Listing only. Admins delete through ``service.delete()``, which already lets
 them; nothing here hands out a ``Credential`` or a token, and
@@ -36,7 +36,7 @@ async def list_all_credentials(
 ) -> list[AdminCredentialInfo]:
     """Every credential, oldest first, optionally filtered by exact
     ``owner`` id, ``type`` and ``status``. Raises ``CredentialForbidden``
-    unless the actor holds ``google-auth-admin``."""
+    unless the actor holds ``google-credentials-admin``."""
     if not actor or not await can_admin(datasette, actor):
         raise CredentialForbidden("You don't have permission to list all credentials")
     rows = await InternalDB(datasette.get_internal_database()).list_all()
@@ -72,7 +72,7 @@ async def actor_names(datasette: Datasette, ids: list[str]) -> dict[str, str]:
         actors = await datasette.actors_from_ids(ids) or {}
     except Exception:
         logger.warning(
-            "datasette-google-auth: actors_from_ids failed; showing actor ids",
+            "datasette-google-credentials: actors_from_ids failed; showing actor ids",
             exc_info=True,
         )
         return {}

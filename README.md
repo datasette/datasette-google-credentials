@@ -1,10 +1,10 @@
-# datasette-google-auth
+# datasette-google-credentials
 
 Google credentials for Datasette: shared service accounts and per-user OAuth
 connections, stored encrypted and brokered to other plugins.
 
 This is a **base plugin**. On its own it lets people connect Google accounts
-and add service-account keys at `/-/google-auth`; other plugins then ask it
+and add service-account keys at `/-/google-credentials`; other plugins then ask it
 for an access token (or an authenticated request) on behalf of the signed-in
 actor. It adds nothing to SQL: no functions, no virtual tables.
 
@@ -23,7 +23,7 @@ Load them with `--plugins-dir samples` (`just dev` does).
 **Two kinds of credential.**
 
 - A **service account** is a Google Cloud robot identity. Someone with
-  `google-auth-add-service-account` pastes its JSON key, and can then share it
+  `google-credentials-add-service-account` pastes its JSON key, and can then share it
   with other people through the
   [datasette-acl-share](https://github.com/datasette/datasette-acl-share)
   dialog. It can only open spreadsheets that were shared with its
@@ -57,7 +57,7 @@ datasette-acl-share, which are installed as dependencies. See
 ### 1. Generate an encryption key
 
 ```bash
-datasette google-auth generate-key
+datasette google-credentials generate-key
 ```
 
 This prints a new Fernet key. Keep it secret and keep it safe: anyone who has
@@ -78,23 +78,23 @@ stops Datasette from starting.
 > credential, and every sharing grant, lives in the internal database. Without
 > `--internal`, Datasette uses a temporary file that is deleted when it exits,
 > so every connected account and service account vanishes on restart.
-> `GET /-/google-auth/api/status` reports this as `internal_db_persistent`,
+> `GET /-/google-credentials/api/status` reports this as `internal_db_persistent`,
 > and the management page shows a warning.
 
 ### 3. `datasette.yaml`
 
 ```yaml
 plugins:
-  datasette-google-auth:
+  datasette-google-credentials:
     # Required to store credentials. A list enables key rotation (see below).
     encryption-key:
-      $env: DATASETTE_GOOGLE_AUTH_KEY
+      $env: DATASETTE_GOOGLE_CREDENTIALS_KEY
     # Optional: both are needed for "Connect Google". Without them, only
     # service accounts are available.
     client_id:
-      $env: DATASETTE_GOOGLE_AUTH_CLIENT_ID
+      $env: DATASETTE_GOOGLE_CREDENTIALS_CLIENT_ID
     client_secret:
-      $env: DATASETTE_GOOGLE_AUTH_CLIENT_SECRET
+      $env: DATASETTE_GOOGLE_CREDENTIALS_CLIENT_SECRET
     # Optional: the scopes "Connect Google" asks for. This is the default;
     # openid and email are always added if you leave them out.
     scopes:
@@ -102,24 +102,24 @@ plugins:
       - email
       - https://www.googleapis.com/auth/spreadsheets
     # Optional: only needed behind a proxy that hides the public URL.
-    # redirect_uri: https://datasette.example.com/-/google-auth/oauth/callback
+    # redirect_uri: https://datasette.example.com/-/google-credentials/oauth/callback
 
 permissions:
   # Everyone signed in can connect their own Google account...
-  google-auth-connect:
+  google-credentials-connect:
     id: "*"
   # ...only these people can add service accounts...
-  google-auth-add-service-account:
+  google-credentials-add-service-account:
     id: [alice, bob]
   # ...and only alice can list and delete everyone's credentials.
-  google-auth-admin:
+  google-credentials-admin:
     id: alice
 ```
 
 ```bash
-export DATASETTE_GOOGLE_AUTH_KEY="<output of datasette google-auth generate-key>"
-export DATASETTE_GOOGLE_AUTH_CLIENT_ID="<your-client-id>.apps.googleusercontent.com"
-export DATASETTE_GOOGLE_AUTH_CLIENT_SECRET="<your-client-secret>"
+export DATASETTE_GOOGLE_CREDENTIALS_KEY="<output of datasette google-credentials generate-key>"
+export DATASETTE_GOOGLE_CREDENTIALS_CLIENT_ID="<your-client-id>.apps.googleusercontent.com"
+export DATASETTE_GOOGLE_CREDENTIALS_CLIENT_SECRET="<your-client-secret>"
 datasette serve data.db -c datasette.yaml --internal internal.db
 ```
 
@@ -135,17 +135,17 @@ field (and never echoes its value).
 `encryption-key` accepts a list. The **first** key encrypts, and **every** key
 is tried when decrypting. To replace a key:
 
-1. Generate a new one with `datasette google-auth generate-key` and put it in
+1. Generate a new one with `datasette google-credentials generate-key` and put it in
    a new environment variable.
 2. **Prepend** it to the list, keeping the old key after it, and restart
    Datasette:
 
    ```yaml
    plugins:
-     datasette-google-auth:
+     datasette-google-credentials:
        encryption-key:
-         - $env: DATASETTE_GOOGLE_AUTH_KEY_NEW
-         - $env: DATASETTE_GOOGLE_AUTH_KEY
+         - $env: DATASETTE_GOOGLE_CREDENTIALS_KEY_NEW
+         - $env: DATASETTE_GOOGLE_CREDENTIALS_KEY
    ```
 
    New and updated credentials are now encrypted with the new key, and
@@ -154,13 +154,13 @@ is tried when decrypting. To replace a key:
    environment variables the server uses:
 
    ```bash
-   datasette google-auth rotate-keys --internal internal.db -c datasette.yaml
+   datasette google-credentials rotate-keys --internal internal.db -c datasette.yaml
    ```
 
    It prints how many credentials it re-encrypted. If any could not be
    decrypted with any configured key it lists their ids and exits non-zero:
    **don't drop the old key until it succeeds.** Pass the keys through
-   `-c` and `$env`, as above, rather than `-s plugins.datasette-google-auth.encryption-key ...`,
+   `-c` and `$env`, as above, rather than `-s plugins.datasette-google-credentials.encryption-key ...`,
    which would put the key in your shell history.
 4. **Drop** the old key from the list and restart.
 
@@ -172,7 +172,7 @@ and are left untouched: putting the old key back fixes them.
 
 ## The management page
 
-`/-/google-auth` is where people connect Google accounts, add, rename,
+`/-/google-credentials` is where people connect Google accounts, add, rename,
 rotate, share and delete service accounts, and delete credentials. The
 Datasette menu links to it as "Google accounts" for signed-in actors who hold
 any of the three global actions (see [Permissions](#permissions)).
@@ -180,7 +180,7 @@ any of the three global actions (see [Permissions](#permissions)).
 ![The management page: two connected Google accounts, one broken with a Reconnect button, and two service accounts, one shared with you as User](docs/screenshots/index.png)
 
 - **Anonymous visitors get 403.** Any signed-in actor gets the page, even
-  without a google-auth action: a service account may have been shared with
+  without a google-credentials action: a service account may have been shared with
   them, and the page is where they find its `client_email` to share sheets
   with.
 - **Connect Google and Reconnect come back to the page**, and report the
@@ -189,7 +189,7 @@ any of the three global actions (see [Permissions](#permissions)).
 - **Setup notices** appear when something is missing: the `encryption-key`,
   the OAuth client, or a persistent internal database. The fix (config
   snippets, and the exact redirect URI to register) is shown only to
-  `google-auth-admin` actors, which includes root under `--root`; everyone
+  `google-credentials-admin` actors, which includes root under `--root`; everyone
   else sees a short notice to ask an admin.
 
 ![Setup notices on an unconfigured Datasette: no encryption key, no OAuth client (with the redirect URI to register), no persistent internal database](docs/screenshots/setup-notices.png)
@@ -221,7 +221,7 @@ Skip this section if you only want service accounts.
    exactly:
 
    ```
-   https://<your-datasette-host>/-/google-auth/oauth/callback
+   https://<your-datasette-host>/-/google-credentials/oauth/callback
    ```
 
    Datasette builds it from the incoming request, so it must match the scheme
@@ -230,8 +230,8 @@ Skip this section if you only want service accounts.
    that rewrites the host or scheme, set `redirect_uri` in the plugin config
    to the public URL and register that.
 5. Put the client ID and secret in the environment variables your
-   `datasette.yaml` reads (`DATASETTE_GOOGLE_AUTH_CLIENT_ID` and
-   `DATASETTE_GOOGLE_AUTH_CLIENT_SECRET` above) and restart.
+   `datasette.yaml` reads (`DATASETTE_GOOGLE_CREDENTIALS_CLIENT_ID` and
+   `DATASETTE_GOOGLE_CREDENTIALS_CLIENT_SECRET` above) and restart.
 
 Connecting always asks for `access_type=offline` and `prompt=consent`, with
 PKCE and a signed, actor-bound `state`, so that Google returns a refresh
@@ -300,7 +300,7 @@ two spellings as the same scope (see [Scopes](#scopes)).
    Create new key > JSON > Create. The key file downloads once and can't be
    downloaded again
    ([Google: create and delete service account keys](https://docs.cloud.google.com/iam/docs/keys-create-delete)).
-3. **Add it** at `/-/google-auth` (needs `google-auth-add-service-account`):
+3. **Add it** at `/-/google-credentials` (needs `google-credentials-add-service-account`):
    paste the file's contents. The plugin checks that it is a service-account
    key with a parseable RSA private key and a `client_email` ending in
    `.gserviceaccount.com`, then **exchanges it for a token with Google before
@@ -347,9 +347,9 @@ datasette-acl is a hard dependency. Three **global** actions are granted in
 
 | Action | Allows |
 | ------ | ------ |
-| `google-auth-connect` | Connect your own Google account ("Connect Google") |
-| `google-auth-add-service-account` | Add a service account |
-| `google-auth-admin` | List every credential, and delete any of them. **Never** use, rename or rotate someone else's |
+| `google-credentials-connect` | Connect your own Google account ("Connect Google") |
+| `google-credentials-add-service-account` | Add a service account |
+| `google-credentials-admin` | List every credential, and delete any of them. **Never** use, rename or rotate someone else's |
 
 Three **per-service-account** actions are datasette-acl grants on the resource
 type `google-service-account` (one level: the credential id), bundled into
@@ -381,11 +381,11 @@ Who can do what with a credential:
 | Rename | Owner only | `-edit` (Editor and up) |
 | Rotate key | n/a (reconnect instead) | `-edit` (Editor and up) |
 | Share | Never | `-manage` (Manager) |
-| Delete | Owner, or `google-auth-admin` | `-manage`, or `google-auth-admin` |
+| Delete | Owner, or `google-credentials-admin` | `-manage`, or `google-credentials-admin` |
 
 An id you can't see behaves exactly like one that doesn't exist (404
 `not_found`), so ids can't be probed. You get 403 `forbidden` only for a
-credential you can see but not act on: as `google-auth-admin` looking at
+credential you can see but not act on: as `google-credentials-admin` looking at
 someone else's, or as a service account's User trying to rename it.
 
 `--root` holds every action unless a `permissions:` block for it names
@@ -422,8 +422,8 @@ What the plugin protects:
   revocation.
 - **The OAuth flow is bound to the actor who started it**: signed, 10-minute
   `state`; a matching nonce in a signed, HttpOnly flow cookie scoped to
-  `/-/google-auth/`; PKCE. `return_to` must be a same-origin path, or the
-  flow falls back to `/-/google-auth`.
+  `/-/google-credentials/`; PKCE. `return_to` must be a same-origin path, or the
+  flow falls back to `/-/google-credentials`.
 - **CSRF:** the JSON API needs no token. Datasette (1.0a41 and later) rejects
   cross-site browser POSTs using `Sec-Fetch-Site` / `Origin` before any route
   runs; same-origin `fetch()` and non-browser clients pass. Send
@@ -431,10 +431,10 @@ What the plugin protects:
 - **Request bodies are capped at 16 KB** on every plugin route (a JSON 413
   `payload_too_large`). A service-account key file is about 2.4 KB.
 
-What `google-auth-admin` can and can't do: it can list every credential with
+What `google-credentials-admin` can and can't do: it can list every credential with
 its owner and last use (the "All Google credentials" page at
-`/-/google-auth/admin`, linked from the management page, or
-`GET /-/google-auth/api/admin/credentials`), and delete any credential, which
+`/-/google-credentials/admin`, linked from the management page, or
+`GET /-/google-credentials/api/admin/credentials`), and delete any credential, which
 revokes an OAuth grant at Google. It **cannot**
 use, rename or rotate someone else's credential, share a service account, or
 see any secret. It is meant for offboarding and incidents.
@@ -454,18 +454,18 @@ What isn't protected:
 - **Deleting a service account doesn't delete its key at Google.** Delete it
   in the Cloud console, as above.
 - **A departing user's OAuth connections stay** until they or a
-  `google-auth-admin` delete them.
+  `google-credentials-admin` delete them.
 
 ## Using it from a plugin
 
-Everything below is importable from `datasette_google_auth`. Always pass the
+Everything below is importable from `datasette_google_credentials`. Always pass the
 actor the request is for; there is no "system" mode in v0, so a credential
 can only be used during a request by an actor who may use it.
 
 ### Listing and getting credentials
 
 ```python
-from datasette_google_auth import get_credential, list_credentials
+from datasette_google_credentials import get_credential, list_credentials
 
 SHEETS_READONLY = "https://www.googleapis.com/auth/spreadsheets.readonly"
 
@@ -489,7 +489,7 @@ accounts shared with them. With `scopes`, OAuth connections that weren't
 granted them are left out; service accounts always qualify, because they mint
 whatever scopes are asked for (whether a given file is shared with one only a
 request can tell). Broken credentials are included, so a picker can offer
-"Reconnect". Anonymous actors get `[]`, and `google-auth-admin` doesn't widen
+"Reconnect". Anonymous actors get `[]`, and `google-credentials-admin` doesn't widen
 the list.
 
 **`CredentialInfo`** is a Pydantic model with no secrets in it: `id` (a
@@ -548,7 +548,7 @@ first. Service accounts are minted exactly the scopes you ask for.
 
 ### Errors
 
-Every error subclasses `GoogleAuthError` and has a stable `code`. Branch on
+Every error subclasses `GoogleCredentialsError` and has a stable `code`. Branch on
 the class or the code, never the message. Messages contain no secrets and are
 safe to show to the user.
 
@@ -564,7 +564,7 @@ safe to show to the user.
 | `GoogleTokenError` | `google_error` | 502 | A Google token endpoint failed another way (5xx, network, bad reply). Has `.status`, `.error`, `.description` |
 | `EncryptionNotConfigured` | `encryption_not_configured` | 503 | No `encryption-key` |
 | `CredentialUndecryptable` | `credential_undecryptable` | 500 | No configured key decrypts it (was `encryption-key` changed?) |
-| `GoogleAuthError` | `google_auth_error` | 500 | Base class |
+| `GoogleCredentialsError` | `google_credentials_error` | 500 | Base class |
 
 The HTTP API also returns `invalid_label` (400) for an empty or over-long
 label, `payload_too_large` (413) and `internal_error` (500).
@@ -574,7 +574,7 @@ label, `payload_too_large` (413) and `internal_error` (500).
 
 ```json
 {"ok": false, "error": "<message>", "code": "missing_scopes",
- "reconnect_url": "/-/google-auth/connect", "missing": ["..."]}
+ "reconnect_url": "/-/google-credentials/connect", "missing": ["..."]}
 ```
 
 `reconnect_url` is present only when reconnecting can fix the problem, and
@@ -583,7 +583,7 @@ label, `payload_too_large` (413) and `internal_error` (500).
 **Sending the user through Connect Google and back.** The `reconnect_url` on
 an error has no `return_to` (the broker doesn't know your page). Build your
 own with **`connect_url(datasette, return_to=path)`**, which returns
-`/-/google-auth/connect?return_to=...` (with Datasette's `base_url` applied).
+`/-/google-credentials/connect?return_to=...` (with Datasette's `base_url` applied).
 After connecting, the user lands back on `return_to`, which must be a
 same-origin path.
 
@@ -601,9 +601,9 @@ from urllib.parse import quote
 
 from datasette import Response, hookimpl
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialBroken,
-    GoogleAuthError,
+    GoogleCredentialsError,
     MissingScopes,
     connect_url,
     error_response,
@@ -643,7 +643,7 @@ async def sheet_preview(datasette, request):
             return error_response(error)
         # Reconnecting can fix it: come back here afterwards.
         return Response.redirect(connect_url(datasette, return_to=here))
-    except GoogleAuthError as error:
+    except GoogleCredentialsError as error:
         return error_response(error)
 
     if response.status_code != 200:
@@ -661,24 +661,24 @@ def register_routes():
 
 ### HTTP endpoints for consumers
 
-- **`GET /-/google-auth/api/credentials?scopes=a,b`** returns
+- **`GET /-/google-credentials/api/credentials?scopes=a,b`** returns
   `{"credentials": [CredentialInfo, ...]}` for the current actor, the same as
   `list_credentials()`. `scopes` may be comma- or space-separated, or
   repeated. Anonymous actors get an empty list.
-- **`GET /-/google-auth/connect?return_to=/path`** starts Connect Google and
+- **`GET /-/google-credentials/connect?return_to=/path`** starts Connect Google and
   comes back to `return_to`. 404 if the OAuth client isn't configured, 403
-  without `google-auth-connect`.
+  without `google-credentials-connect`.
 
 The rest of the JSON API serves the management page:
 
 | Route | Does |
 | ----- | ---- |
-| `GET /-/google-auth/api/status` | Setup flags (encryption and OAuth configured, internal DB persistent, the redirect URI) and the actor's permissions |
-| `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` | Every credential with owner and last use, plus `actor_names` (display names from `actors_from_ids`) (`google-auth-admin`) |
-| `POST /-/google-auth/api/service-accounts` `{label?, key_json}` | Add a service account; the response includes `share_with_email` |
-| `POST /-/google-auth/api/credentials/{id}/rename` `{label}` | Rename |
-| `POST /-/google-auth/api/credentials/{id}/rotate-key` `{key_json}` | Rotate a service account's key |
-| `POST /-/google-auth/api/credentials/{id}/delete` | Delete; says whether Google confirmed an OAuth revocation, or which service-account key to delete in the console |
+| `GET /-/google-credentials/api/status` | Setup flags (encryption and OAuth configured, internal DB persistent, the redirect URI) and the actor's permissions |
+| `GET /-/google-credentials/api/admin/credentials?owner=&type=&status=` | Every credential with owner and last use, plus `actor_names` (display names from `actors_from_ids`) (`google-credentials-admin`) |
+| `POST /-/google-credentials/api/service-accounts` `{label?, key_json}` | Add a service account; the response includes `share_with_email` |
+| `POST /-/google-credentials/api/credentials/{id}/rename` `{label}` | Rename |
+| `POST /-/google-credentials/api/credentials/{id}/rotate-key` `{key_json}` | Rotate a service account's key |
+| `POST /-/google-credentials/api/credentials/{id}/delete` | Delete; says whether Google confirmed an OAuth revocation, or which service-account key to delete in the console |
 
 Errors from all of them use the `error_response()` shape above.
 
@@ -692,11 +692,11 @@ secret. There are no per-use events: the credential's `last_used_at` /
 
 | Event | Fired when | Extra fields |
 | ----- | ---------- | ------------ |
-| `google-auth-credential-created` | A service account is added, or a Google account connected for the first time | |
-| `google-auth-credential-reconnected` | An existing Google connection is connected again | |
-| `google-auth-credential-rotated` | A service account gets a new key | |
-| `google-auth-credential-deleted` | A credential is deleted | `revoked`: for OAuth, whether Google confirmed the revocation; `None` for service accounts |
-| `google-auth-credential-broken` | Google rejected the stored key or grant | `detail`: the message users see |
+| `google-credential-created` | A service account is added, or a Google account connected for the first time | |
+| `google-credential-reconnected` | An existing Google connection is connected again | |
+| `google-credential-rotated` | A service account gets a new key | |
+| `google-credential-deleted` | A credential is deleted | `revoked`: for OAuth, whether Google confirmed the revocation; `None` for service accounts |
+| `google-credential-broken` | Google rejected the stored key or grant | `detail`: the message users see |
 
 Rotating the `encryption-key` fires no event.
 
@@ -728,7 +728,7 @@ just dev
 
 `uv sync` expects sibling checkouts of `datasette-acl` and `datasette-acl-share`
 in `../` (see `[tool.uv.sources]` in `pyproject.toml`). `just dev` serves on
-port 8021 with `--internal .tmp/internal.db`, grants every google-auth action
+port 8021 with `--internal .tmp/internal.db`, grants every google-credentials action
 to everyone and loads `samples/`. The test suite never contacts Google: it
 runs against an in-process mock (`tests/mock_google/`).
 
@@ -738,109 +738,109 @@ calls). It needs Chromium once: `npx --prefix frontend playwright install chromi
 
 ## Telemetry
 
-OpenTelemetry spans and metrics under the `datasette_google_auth` scope, using
+OpenTelemetry spans and metrics under the `datasette_google_credentials` scope, using
 Datasette's telemetry kit. Nothing is recorded unless you install an
 OpenTelemetry SDK and provider. The reference below is generated from
-`datasette_google_auth/telemetry_registry.py` by `just telemetry-doc`; don't
+`datasette_google_credentials/telemetry_registry.py` by `just telemetry-doc`; don't
 edit it by hand.
 
 <!-- telemetry-reference:start -->
 
 #### Spans
 
-**`datasette_google_auth.token`** — `Credential.token()`: re-reading the credential, re-checking access, then serving from the token cache or minting/refreshing. On a cache miss the `token.mint` or `token.refresh` span is its child. Status is `ERROR` for any exception except the access decisions `CredentialNotFound`, `CredentialForbidden` and `MissingScopes`, which are outcomes (like an HTTP 4xx) and only set `error.type`.
+**`datasette_google_credentials.token`** — `Credential.token()`: re-reading the credential, re-checking access, then serving from the token cache or minting/refreshing. On a cache miss the `token.mint` or `token.refresh` span is its child. Status is `ERROR` for any exception except the access decisions `CredentialNotFound`, `CredentialForbidden` and `MissingScopes`, which are outcomes (like an HTTP 4xx) and only set `error.type`.
 
 Attributes:
 
-- `datasette_google_auth.credential.id` — The credential's ULID. Opaque, and **spans only, never a metric dimension**. Owner, actor and email are never recorded.
-- `datasette_google_auth.credential.type` *(optional)* — `service_account` or `google_oauth`. Set once the credential has been re-read; absent when it doesn't exist or the actor can't see it.
-- `datasette_google_auth.cache` *(optional)* — `hit` or `miss`. Set once the token is in hand; absent when access was denied or the fetch failed.
+- `datasette_google_credentials.credential.id` — The credential's ULID. Opaque, and **spans only, never a metric dimension**. Owner, actor and email are never recorded.
+- `datasette_google_credentials.credential.type` *(optional)* — `service_account` or `google_oauth`. Set once the credential has been re-read; absent when it doesn't exist or the actor can't see it.
+- `datasette_google_credentials.cache` *(optional)* — `hit` or `miss`. Set once the token is in hand; absent when access was denied or the fetch failed.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
-**`datasette_google_auth.request`** — `Credential.request()`: one authenticated call to a Google API, with its `token` span(s) as children (two on a 401 retry). A returned 4xx or 5xx is the consumer's to handle and leaves the status unset; status is `ERROR` only when an exception escapes, other than the access decisions the `token` span also exempts.
+**`datasette_google_credentials.request`** — `Credential.request()`: one authenticated call to a Google API, with its `token` span(s) as children (two on a 401 retry). A returned 4xx or 5xx is the consumer's to handle and leaves the status unset; status is `ERROR` only when an exception escapes, other than the access decisions the `token` span also exempts.
 
 Attributes:
 
-- `datasette_google_auth.credential.id` — The credential's ULID. Opaque, and **spans only, never a metric dimension**. Owner, actor and email are never recorded.
-- `datasette_google_auth.credential.type` — `service_account` or `google_oauth`.
+- `datasette_google_credentials.credential.id` — The credential's ULID. Opaque, and **spans only, never a metric dimension**. Owner, actor and email are never recorded.
+- `datasette_google_credentials.credential.type` — `service_account` or `google_oauth`.
 - `http.request.method` — The request method, clamped by core's `clamp_http_method` (anything outside RFC 9110 + PATCH is `_OTHER`).
 - `server.address` — The host of the requested URL. Never the path or query.
 - `http.response.status_code` *(optional)* — The HTTP status of the API's reply: the retry's, after a 401. Absent when no response arrived.
-- `datasette_google_auth.retried` — `True` if the first response was a 401, so the cached token was evicted and the request retried once with a fresh one.
+- `datasette_google_credentials.retried` — `True` if the first response was a 401, so the cached token was evicted and the request retried once with a fresh one.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
-**`datasette_google_auth.token.mint`** — A service-account JWT-bearer exchange at Google's token endpoint, for the broker or the live test when a key is added or rotated. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
+**`datasette_google_credentials.token.mint`** — A service-account JWT-bearer exchange at Google's token endpoint, for the broker or the live test when a key is added or rotated. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
 
 Attributes:
 
-- `datasette_google_auth.scopes.count` — How many scopes the service-account token was minted for.
-- `datasette_google_auth.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
+- `datasette_google_credentials.scopes.count` — How many scopes the service-account token was minted for.
+- `datasette_google_credentials.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
 - `http.response.status_code` *(optional)* — The HTTP status of Google's reply. Absent when Google never answered.
-- `datasette_google_auth.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
+- `datasette_google_credentials.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
-**`datasette_google_auth.token.refresh`** — An OAuth refresh-token grant at Google's token endpoint. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
+**`datasette_google_credentials.token.refresh`** — An OAuth refresh-token grant at Google's token endpoint. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
 
 Attributes:
 
-- `datasette_google_auth.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
+- `datasette_google_credentials.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
 - `http.response.status_code` *(optional)* — The HTTP status of Google's reply. Absent when Google never answered.
-- `datasette_google_auth.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
-- `datasette_google_auth.refresh_token.rotated` *(optional)* — `True` if Google returned a new refresh token. Set on success only.
+- `datasette_google_credentials.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
+- `datasette_google_credentials.refresh_token.rotated` *(optional)* — `True` if Google returned a new refresh token. Set on success only.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
-**`datasette_google_auth.oauth.exchange`** — The authorization-code (+ PKCE verifier) exchange during the Connect Google callback. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
+**`datasette_google_credentials.oauth.exchange`** — The authorization-code (+ PKCE verifier) exchange during the Connect Google callback. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
 
 Attributes:
 
-- `datasette_google_auth.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
+- `datasette_google_credentials.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
 - `http.response.status_code` *(optional)* — The HTTP status of Google's reply. Absent when Google never answered.
-- `datasette_google_auth.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
+- `datasette_google_credentials.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
-**`datasette_google_auth.oauth.userinfo`** — The OpenID userinfo call that identifies the Google account during the Connect Google callback. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
+**`datasette_google_credentials.oauth.userinfo`** — The OpenID userinfo call that identifies the Google account during the Connect Google callback. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
 
 Attributes:
 
-- `datasette_google_auth.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
+- `datasette_google_credentials.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
 - `http.response.status_code` *(optional)* — The HTTP status of Google's reply. Absent when Google never answered.
-- `datasette_google_auth.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
+- `datasette_google_credentials.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
-**`datasette_google_auth.oauth.revoke`** — Best-effort revocation of a refresh token when an OAuth credential is deleted. The delete goes ahead either way. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
+**`datasette_google_credentials.oauth.revoke`** — Best-effort revocation of a refresh token when an OAuth credential is deleted. The delete goes ahead either way. Status is `ERROR` (with no description) whenever `outcome` isn't `ok`.
 
 Attributes:
 
-- `datasette_google_auth.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
+- `datasette_google_credentials.outcome` — How the Google call ended: `ok`; `invalid_grant` (key deleted or disabled, grant revoked, code reused); `http_error` (any other non-200); `network_error` (Google never answered); `invalid_response` (a 200 without the expected fields).
 - `http.response.status_code` *(optional)* — The HTTP status of Google's reply. Absent when Google never answered.
-- `datasette_google_auth.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
+- `datasette_google_credentials.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
-**`datasette_google_auth.oauth.callback`** — The Connect Google callback (`GET /-/google-auth/oauth/callback`) once the actor is allowed to connect, child of core's request span, with the `oauth.exchange` and `oauth.userinfo` spans as children. Status is `ERROR` for `google_error`, `no_refresh_token`, `invalid_grant`, `token_error`, `not_configured` or an unexpected exception; a user cancelling or a stale link is not an error.
+**`datasette_google_credentials.oauth.callback`** — The Connect Google callback (`GET /-/google-credentials/oauth/callback`) once the actor is allowed to connect, child of core's request span, with the `oauth.exchange` and `oauth.userinfo` spans as children. Status is `ERROR` for `google_error`, `no_refresh_token`, `invalid_grant`, `token_error`, `not_configured` or an unexpected exception; a user cancelling or a stale link is not an error.
 
 Attributes:
 
-- `datasette_google_auth.callback.result` — How the Connect Google callback ended: `created` / `reconnected` (success); `cancelled` (the user clicked Cancel); `google_error` (Google sent another `error`); `invalid_state` (bad, expired or foreign state or flow cookie); `no_code`; `no_refresh_token`; `invalid_grant` (the code exchange was refused); `token_error` (any other Google failure); `not_configured` (no `encryption-key`). Absent only when an unexpected exception escaped.
-- `datasette_google_auth.credential.id` *(optional)* — The ULID of the credential created or reconnected. Set on success only.
-- `datasette_google_auth.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
-- `datasette_google_auth.scopes.missing` *(optional)* — How many configured API scopes the user didn't grant (partial consent). Set on success only; `0` when everything was granted.
+- `datasette_google_credentials.callback.result` — How the Connect Google callback ended: `created` / `reconnected` (success); `cancelled` (the user clicked Cancel); `google_error` (Google sent another `error`); `invalid_state` (bad, expired or foreign state or flow cookie); `no_code`; `no_refresh_token`; `invalid_grant` (the code exchange was refused); `token_error` (any other Google failure); `not_configured` (no `encryption-key`). Absent only when an unexpected exception escaped.
+- `datasette_google_credentials.credential.id` *(optional)* — The ULID of the credential created or reconnected. Set on success only.
+- `datasette_google_credentials.google.error` *(optional)* — Google's OAuth `error` code, from a failed reply or the callback's `error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus Google's documented ones; anything else is `_OTHER`. Never the `error_description`.
+- `datasette_google_credentials.scopes.missing` *(optional)* — How many configured API scopes the user didn't grant (partial consent). Set on success only; `0` when everything was granted.
 - `error.type` *(optional)* — Class name of the exception that ended the operation. Never the message.
 
 #### Metrics
 
 | Metric | Kind | Unit | Attributes | Description |
 |---|---|---|---|---|
-| `datasette_google_auth.google.duration` | Histogram | `s` | `datasette_google_auth.google.operation`<br>`datasette_google_auth.outcome`<br>`datasette_google_auth.google.error` | Duration of one call to a Google OAuth endpoint, by operation and outcome. Its counts are the token fetches by type and outcome: `operation=mint` is service accounts (live tests of new keys included), `operation=refresh` is OAuth. |
-| `datasette_google_auth.token_cache.lookups` | Counter | `{lookup}` | `datasette_google_auth.credential.type`<br>`datasette_google_auth.cache` | Token-cache lookups by credential type and `hit` / `miss`. Hit ratio is hits over the total. |
-| `datasette_google_auth.request.duration` | Histogram | `s` | `datasette_google_auth.credential.type`<br>`http.request.method`<br>`http.response.status_code`<br>`datasette_google_auth.retried`<br>`error.type` | Duration of `Credential.request()`, token fetches and a 401 retry included. |
-| `datasette_google_auth.credentials.broken` | Counter | `{credential}` | `datasette_google_auth.credential.type` | Credentials marked broken because Google refused them (`invalid_grant`). Counted only when the compare-and-swap lands, so a race with a reconnect or rotation isn't counted. |
-| `datasette_google_auth.oauth.callbacks` | Counter | `{callback}` | `datasette_google_auth.callback.result` | Connect Google callbacks by result. |
+| `datasette_google_credentials.google.duration` | Histogram | `s` | `datasette_google_credentials.google.operation`<br>`datasette_google_credentials.outcome`<br>`datasette_google_credentials.google.error` | Duration of one call to a Google OAuth endpoint, by operation and outcome. Its counts are the token fetches by type and outcome: `operation=mint` is service accounts (live tests of new keys included), `operation=refresh` is OAuth. |
+| `datasette_google_credentials.token_cache.lookups` | Counter | `{lookup}` | `datasette_google_credentials.credential.type`<br>`datasette_google_credentials.cache` | Token-cache lookups by credential type and `hit` / `miss`. Hit ratio is hits over the total. |
+| `datasette_google_credentials.request.duration` | Histogram | `s` | `datasette_google_credentials.credential.type`<br>`http.request.method`<br>`http.response.status_code`<br>`datasette_google_credentials.retried`<br>`error.type` | Duration of `Credential.request()`, token fetches and a 401 retry included. |
+| `datasette_google_credentials.credentials.broken` | Counter | `{credential}` | `datasette_google_credentials.credential.type` | Credentials marked broken because Google refused them (`invalid_grant`). Counted only when the compare-and-swap lands, so a race with a reconnect or rotation isn't counted. |
+| `datasette_google_credentials.oauth.callbacks` | Counter | `{callback}` | `datasette_google_credentials.callback.result` | Connect Google callbacks by result. |
 
-Attribute meanings match the span attributes of the same name above. `datasette_google_auth.credential.id` is never a metric dimension, and no signal carries a token, code, key material, email, actor id, label, URL path or query, or error message.
+Attribute meanings match the span attributes of the same name above. `datasette_google_credentials.credential.id` is never a metric dimension, and no signal carries a token, code, key material, email, actor id, label, URL path or query, or error message.
 
 Histogram buckets (seconds):
 
-- `datasette_google_auth.google.duration`: 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
-- `datasette_google_auth.request.duration`: 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
+- `datasette_google_credentials.google.duration`: 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
+- `datasette_google_credentials.request.duration`: 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
 
 <!-- telemetry-reference:end -->

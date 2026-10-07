@@ -6,7 +6,7 @@ import { defineShot } from "../defineShot.mjs";
 
 export default defineShot({
   name: "index",
-  path: "/-/google-auth",
+  path: "/-/google-credentials",
   async prepare(page) {
     await page.locator(".cards > li").nth(3).waitFor();
     await page.locator(".badge-broken").waitFor();

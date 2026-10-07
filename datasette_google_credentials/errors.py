@@ -1,6 +1,6 @@
-"""Exceptions raised by datasette-google-auth.
+"""Exceptions raised by datasette-google-credentials.
 
-Every error subclasses ``GoogleAuthError`` and carries a stable ``code``
+Every error subclasses ``GoogleCredentialsError`` and carries a stable ``code``
 string, so consumers can branch on it without matching message text.
 ``error_response()`` turns any of them into a consistent JSON error.
 
@@ -13,16 +13,18 @@ from typing import Any
 
 from datasette import Response
 
-ENCRYPTION_NOT_CONFIGURED = "datasette-google-auth needs `encryption-key` configured"
+ENCRYPTION_NOT_CONFIGURED = (
+    "datasette-google-credentials needs `encryption-key` configured"
+)
 
 
-class GoogleAuthError(Exception):
-    """Base class for every datasette-google-auth error."""
+class GoogleCredentialsError(Exception):
+    """Base class for every datasette-google-credentials error."""
 
-    code = "google_auth_error"
+    code = "google_credentials_error"
 
 
-class EncryptionNotConfigured(GoogleAuthError):
+class EncryptionNotConfigured(GoogleCredentialsError):
     """No ``encryption-key``: credentials can't be stored or read."""
 
     code = "encryption_not_configured"
@@ -31,7 +33,7 @@ class EncryptionNotConfigured(GoogleAuthError):
         super().__init__(message)
 
 
-class CredentialUndecryptable(GoogleAuthError):
+class CredentialUndecryptable(GoogleCredentialsError):
     """None of the configured keys decrypts a stored credential.
 
     Usually the ``encryption-key`` was changed without keeping the old key in
@@ -47,7 +49,7 @@ class CredentialUndecryptable(GoogleAuthError):
         )
 
 
-class CredentialNotFound(GoogleAuthError):
+class CredentialNotFound(GoogleCredentialsError):
     """No such credential, or one the actor may not know exists.
 
     The two are deliberately indistinguishable (D11: no ID probing).
@@ -60,7 +62,7 @@ class CredentialNotFound(GoogleAuthError):
         super().__init__(f"Credential not found: {credential_id}")
 
 
-class CredentialForbidden(GoogleAuthError):
+class CredentialForbidden(GoogleCredentialsError):
     """The actor may see the credential (or feature) but not do this with it."""
 
     code = "forbidden"
@@ -69,7 +71,7 @@ class CredentialForbidden(GoogleAuthError):
         super().__init__(message)
 
 
-class CredentialBroken(GoogleAuthError):
+class CredentialBroken(GoogleCredentialsError):
     """Google rejected the credential (``invalid_grant``): the key was deleted
     or disabled, or the OAuth grant revoked. Needs a new key or a reconnect.
 
@@ -93,7 +95,7 @@ class CredentialBroken(GoogleAuthError):
         super().__init__(f"{subject} was rejected by Google: {detail}")
 
 
-class CredentialChanged(GoogleAuthError):
+class CredentialChanged(GoogleCredentialsError):
     """The credential was replaced (reconnected, rotated) while it was being
     used, twice in a row. Nothing was written; trying again should work."""
 
@@ -106,7 +108,7 @@ class CredentialChanged(GoogleAuthError):
         )
 
 
-class MissingScopes(GoogleAuthError):
+class MissingScopes(GoogleCredentialsError):
     """An OAuth credential wasn't granted every requested scope.
 
     ``reconnect_url`` is set when reconnecting can fix it: every missing
@@ -132,13 +134,13 @@ class MissingScopes(GoogleAuthError):
             message += (
                 ". This Datasette instance doesn't request "
                 + " ".join(self.not_configured)
-                + ": an administrator must add it to the datasette-google-auth"
+                + ": an administrator must add it to the datasette-google-credentials"
                 " `scopes` setting"
             )
         super().__init__(message)
 
 
-class GoogleTokenError(GoogleAuthError):
+class GoogleTokenError(GoogleCredentialsError):
     """A Google token endpoint failed for a reason other than ``invalid_grant``
     (5xx, ``invalid_scope``, a network error, a malformed reply).
 
@@ -165,20 +167,20 @@ class GoogleTokenError(GoogleAuthError):
         )
 
 
-class InvalidServiceAccountKey(GoogleAuthError):
+class InvalidServiceAccountKey(GoogleCredentialsError):
     """A pasted service-account key was rejected, locally or by Google's test
     exchange. The message names the problem and never echoes key material."""
 
     code = "invalid_service_account_key"
 
 
-class InvalidLabel(GoogleAuthError):
+class InvalidLabel(GoogleCredentialsError):
     """A credential label was empty or too long."""
 
     code = "invalid_label"
 
 
-class DisallowedHost(GoogleAuthError):
+class DisallowedHost(GoogleCredentialsError):
     """``Credential.request()`` refused to send the bearer token to a URL that
     isn't ``https://`` on a Google API host (``*.googleapis.com``) or on the
     origin of a configured ``google_base_urls`` entry (D34). Nothing was
@@ -203,8 +205,8 @@ class DisallowedHost(GoogleAuthError):
 # --- JSON error responses -----------------------------------------------------
 
 # HTTP status per error class. ``error_response`` walks the MRO, so a subclass
-# added later inherits its parent's status (``GoogleAuthError`` itself: 500).
-_STATUS: dict[type[GoogleAuthError], int] = {
+# added later inherits its parent's status (``GoogleCredentialsError`` itself: 500).
+_STATUS: dict[type[GoogleCredentialsError], int] = {
     CredentialNotFound: 404,
     CredentialForbidden: 403,
     # RFC 6750 `insufficient_scope` is a 403 too; `code` tells them apart.
@@ -217,11 +219,11 @@ _STATUS: dict[type[GoogleAuthError], int] = {
     GoogleTokenError: 502,
     EncryptionNotConfigured: 503,
     CredentialUndecryptable: 500,
-    GoogleAuthError: 500,
+    GoogleCredentialsError: 500,
 }
 
 
-def error_status(exc: GoogleAuthError) -> int:
+def error_status(exc: GoogleCredentialsError) -> int:
     """The HTTP status ``error_response`` uses for ``exc``."""
     for cls in type(exc).__mro__:
         status = _STATUS.get(cls)
@@ -230,8 +232,8 @@ def error_status(exc: GoogleAuthError) -> int:
     return 500
 
 
-def error_response(exc: GoogleAuthError) -> Response:
-    """A consumer-facing JSON error for any ``GoogleAuthError``::
+def error_response(exc: GoogleCredentialsError) -> Response:
+    """A consumer-facing JSON error for any ``GoogleCredentialsError``::
 
         {"ok": false, "error": "<message>", "code": "<exc.code>",
          "reconnect_url": "...",   # only when reconnecting can fix it

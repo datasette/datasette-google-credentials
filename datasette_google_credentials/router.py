@@ -49,7 +49,7 @@ def limit_body(view: Callable[..., Any]) -> Callable[..., Any]:
     return limited
 
 
-class GoogleAuthRouter(Router):
+class GoogleCredentialsRouter(Router):
     """A ``Router`` whose views all go through ``limit_body``."""
 
     def routes(self) -> list[tuple[str, Callable[..., Any]]]:
@@ -57,4 +57,4 @@ class GoogleAuthRouter(Router):
 
 
 # The one Router every module in routes/ registers on.
-router = GoogleAuthRouter(title="datasette-google-auth")
+router = GoogleCredentialsRouter(title="datasette-google-credentials")

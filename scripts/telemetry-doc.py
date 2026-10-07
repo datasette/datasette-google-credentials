@@ -13,7 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from datasette_google_auth.telemetry_registry import METRICS, SPANS
+from datasette_google_credentials.telemetry_registry import METRICS, SPANS
 
 README = Path(__file__).parent.parent / "README.md"
 START = "<!-- telemetry-reference:start -->"
@@ -50,7 +50,7 @@ def render() -> str:
     lines.append("")
     lines.append(
         "Attribute meanings match the span attributes of the same name above. "
-        "`datasette_google_auth.credential.id` is never a metric dimension, and "
+        "`datasette_google_credentials.credential.id` is never a metric dimension, and "
         "no signal carries a token, code, key material, email, actor id, label, "
         "URL path or query, or error message."
     )

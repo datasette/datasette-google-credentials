@@ -31,10 +31,13 @@
     busy = true;
     error = null;
     const result = await api(
-      client.POST("/-/google-auth/api/credentials/{credential_id}/rename", {
-        params: { path: { credential_id: credential.id } },
-        body: { label },
-      }),
+      client.POST(
+        "/-/google-credentials/api/credentials/{credential_id}/rename",
+        {
+          params: { path: { credential_id: credential.id } },
+          body: { label },
+        },
+      ),
     );
     busy = false;
     if (result.data) {

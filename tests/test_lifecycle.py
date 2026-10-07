@@ -15,28 +15,28 @@ from mock_google.oauth import (
     SCOPE_SHEETS,
 )
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialBroken,
     CredentialChanged,
     CredentialForbidden,
     CredentialNotFound,
     get_credential,
 )
-from datasette_google_auth import service as service_module
-from datasette_google_auth.broker import SA_BROKEN_DETAIL
-from datasette_google_auth.crypto import decrypt_credential, encrypt_secret
-from datasette_google_auth.errors import InvalidLabel
-from datasette_google_auth.events import EVENTS, mark_broken
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.oauth import BROKEN_DETAIL, FLOW_COOKIE
-from datasette_google_auth.permissions import (
+from datasette_google_credentials import service as service_module
+from datasette_google_credentials.broker import SA_BROKEN_DETAIL
+from datasette_google_credentials.crypto import decrypt_credential, encrypt_secret
+from datasette_google_credentials.errors import InvalidLabel
+from datasette_google_credentials.events import EVENTS, mark_broken
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.oauth import BROKEN_DETAIL, FLOW_COOKIE
+from datasette_google_credentials.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     CONNECT,
     RESOURCE_TYPE,
     seed_manager,
 )
-from datasette_google_auth.service import (
+from datasette_google_credentials.service import (
     DeleteResult,
     add_service_account,
     cloud_console_url,
@@ -45,8 +45,8 @@ from datasette_google_auth.service import (
     rename,
     rotate_service_account_key,
 )
-from datasette_google_auth.service_account import parse_key
-from datasette_google_auth.token_cache import get_token_cache
+from datasette_google_credentials.service_account import parse_key
+from datasette_google_credentials.token_cache import get_token_cache
 
 ALICE = {"id": "alice"}
 BOB = {"id": "bob"}
@@ -54,11 +54,11 @@ ADMIN_ACTOR = {"id": "admin"}
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
 
 EVENT_NAMES = {
-    "google-auth-credential-created",
-    "google-auth-credential-reconnected",
-    "google-auth-credential-rotated",
-    "google-auth-credential-deleted",
-    "google-auth-credential-broken",
+    "google-credential-created",
+    "google-credential-reconnected",
+    "google-credential-rotated",
+    "google-credential-deleted",
+    "google-credential-broken",
 }
 
 
@@ -71,7 +71,7 @@ class EventRecorder:
 
     @hookimpl
     def track_event(self, datasette, event):
-        if event.name.startswith("google-auth-"):
+        if event.name.startswith("google-credential-"):
             self.events.append(event)
 
     def names(self):
@@ -157,7 +157,7 @@ async def share(datasette, credential_id, role, actor_id="bob"):
 async def connect(datasette, mock_google, actor=ALICE):
     """The full Connect Google flow against the mock."""
     response = await datasette.client.get(
-        "/-/google-auth/connect?" + urlencode({"return_to": "/"}), actor=actor
+        "/-/google-credentials/connect?" + urlencode({"return_to": "/"}), actor=actor
     )
     assert response.status_code == 302
     cookie = response.cookies[FLOW_COOKIE]
@@ -194,7 +194,7 @@ async def test_five_events_registered(mock_google):
 
 
 def test_service_module_reexports_rotate():
-    from datasette_google_auth import service_account
+    from datasette_google_credentials import service_account
 
     assert (
         service_module.rotate_service_account_key
@@ -284,8 +284,8 @@ async def test_reconnect_url(mock_google, service_account_keys):
     row, _ = await add_oauth(datasette, mock_google)
     url = await reconnect_url(datasette, ALICE, row.id)
     parts = urlsplit(url)
-    assert parts.path == "/-/google-auth/connect"
-    assert parse_qs(parts.query) == {"return_to": ["/-/google-auth"]}
+    assert parts.path == "/-/google-credentials/connect"
+    assert parse_qs(parts.query) == {"return_to": ["/-/google-credentials"]}
 
     with pytest.raises(CredentialNotFound):
         await reconnect_url(datasette, BOB, row.id)
@@ -425,8 +425,8 @@ async def test_undecryptable_oauth_credential_is_still_deleted(mock_google):
     datasette = await make_datasette(mock_google)
     row, _ = await add_oauth(datasette, mock_google)
     # The encryption key was replaced without keeping the old one.
-    config = datasette._google_auth_config
-    datasette._google_auth_config = config.model_copy(
+    config = datasette._google_credentials_config
+    datasette._google_credentials_config = config.model_copy(
         update={"encryption_key": Fernet.generate_key().decode()}
     )
 
@@ -520,9 +520,9 @@ async def test_service_account_events(mock_google, service_account_keys, events)
         "google_email": SA_TEST,
     }
     assert events.names() == [
-        "google-auth-credential-created",
-        "google-auth-credential-rotated",
-        "google-auth-credential-deleted",
+        "google-credential-created",
+        "google-credential-rotated",
+        "google-credential-deleted",
     ]
     created, rotated, deleted = events.events
     assert payload(created) == common | {"actor": ALICE}
@@ -547,9 +547,9 @@ async def test_oauth_connect_reconnect_delete_events(mock_google, events):
         "actor": ALICE,
     }
     assert events.names() == [
-        "google-auth-credential-created",
-        "google-auth-credential-reconnected",
-        "google-auth-credential-deleted",
+        "google-credential-created",
+        "google-credential-reconnected",
+        "google-credential-deleted",
     ]
     created, reconnected, deleted = events.events
     assert payload(created) == common
@@ -564,7 +564,7 @@ async def test_revoke_failure_event_says_not_revoked(mock_google, events):
     mock_google.faults.fail("/revoke", 500)
     await delete(datasette, ADMIN_ACTOR, row.id)
     (deleted,) = events.events
-    assert deleted.name == "google-auth-credential-deleted"
+    assert deleted.name == "google-credential-deleted"
     assert deleted.revoked is False
     assert deleted.actor == ADMIN_ACTOR
 
@@ -617,7 +617,7 @@ async def test_service_account_broken_event(mock_google, service_account_keys, e
     with pytest.raises(CredentialBroken):
         await cred.token()
     (broken,) = events.events
-    assert broken.name == "google-auth-credential-broken"
+    assert broken.name == "google-credential-broken"
     assert broken.detail == SA_BROKEN_DETAIL
     assert broken.actor == BOB
     assert broken.owner_id == "alice"
@@ -642,14 +642,14 @@ async def test_no_broken_event_when_compare_and_swap_loses(
     assert current is not None and current.status == "ok"
 
     assert await mark_broken(datasette, current, "rejected", actor_id="alice")
-    assert events.names() == ["google-auth-credential-broken"]
+    assert events.names() == ["google-credential-broken"]
 
 
 @pytest.mark.asyncio
 async def test_no_broken_event_when_key_rotated_during_mint(
     mock_google, service_account_keys, monkeypatch, events
 ):
-    from datasette_google_auth import broker
+    from datasette_google_credentials import broker
 
     datasette = await make_datasette(mock_google)
     row = await add_unregistered_sa(datasette, service_account_keys)

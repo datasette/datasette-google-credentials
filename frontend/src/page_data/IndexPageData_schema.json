@@ -166,7 +166,7 @@
       "type": "object"
     }
   },
-  "description": "The ``/-/google-auth`` management page (ticket 14).",
+  "description": "The ``/-/google-credentials`` management page (ticket 14).",
   "properties": {
     "status": {
       "$ref": "#/$defs/StatusResponse"

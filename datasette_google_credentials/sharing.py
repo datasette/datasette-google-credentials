@@ -25,9 +25,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 #: The one template every page renders (``routes/pages.py``).
-TEMPLATE = "google_auth_base.html"
+TEMPLATE = "google_credentials_base.html"
 #: The management page's path.
-PAGE_PATH = "/-/google-auth"
+PAGE_PATH = "/-/google-credentials"
 
 _warned = False
 
@@ -53,7 +53,7 @@ def share_assets(datasette: Datasette) -> dict[str, list] | None:
         if not _warned:
             _warned = True
             logger.warning(
-                "datasette-google-auth: datasette-acl-share's frontend isn't"
+                "datasette-google-credentials: datasette-acl-share's frontend isn't"
                 " built (no manifest.json), so service accounts can't be"
                 " shared from the Google accounts page"
             )

@@ -1,4 +1,4 @@
-"""datasette-google-auth: Google credentials and a token broker for Datasette.
+"""datasette-google-credentials: Google credentials and a token broker for Datasette.
 
 This module holds the plugin hooks and re-exports the consumer API (D11);
 the implementation lives in ``broker.py`` and ``errors.py``.
@@ -20,7 +20,7 @@ from .errors import (
     CredentialUndecryptable,
     DisallowedHost,
     EncryptionNotConfigured,
-    GoogleAuthError,
+    GoogleCredentialsError,
     GoogleTokenError,
     InvalidServiceAccountKey,
     MissingScopes,
@@ -50,7 +50,7 @@ __all__ = [
     "CredentialUndecryptable",
     "DisallowedHost",
     "EncryptionNotConfigured",
-    "GoogleAuthError",
+    "GoogleCredentialsError",
     "GoogleTokenError",
     "InvalidServiceAccountKey",
     "MissingScopes",
@@ -70,9 +70,9 @@ def register_routes():
 def extra_template_vars(datasette):
     entry = vite_entry(
         datasette=datasette,
-        plugin_package="datasette_google_auth",
+        plugin_package="datasette_google_credentials",
     )
-    return {"datasette_google_auth_vite_entry": entry}
+    return {"datasette_google_credentials_vite_entry": entry}
 
 
 @hookimpl
@@ -81,7 +81,10 @@ def menu_links(datasette, actor):
         if not await has_any_global_action(datasette, actor):
             return []
         return [
-            {"href": datasette.urls.path("/-/google-auth"), "label": "Google accounts"}
+            {
+                "href": datasette.urls.path("/-/google-credentials"),
+                "label": "Google accounts",
+            }
         ]
 
     return inner
@@ -121,9 +124,9 @@ def datasette_acl_roles(datasette):
 
 @hookimpl
 def register_commands(cli):
-    from .cli import google_auth
+    from .cli import google_credentials
 
-    cli.add_command(google_auth)
+    cli.add_command(google_credentials)
 
 
 @hookimpl
@@ -140,15 +143,15 @@ def startup(datasette):
                 f"Invalid {PLUGIN_NAME} plugin configuration:\n"
                 f"  encryption-key: {error}"
             ) from None
-        datasette._google_auth_config = config
+        datasette._google_credentials_config = config
         # Access tokens live only in memory, per process (D7).
-        datasette._google_auth_tokens = TokenCache()
+        datasette._google_credentials_tokens = TokenCache()
 
-        def apply_google_auth_migrations(connection):
+        def apply_google_credentials_migrations(connection):
             internal_migrations.apply(SqliteUtilsDatabase(connection))
 
         await datasette.get_internal_database().execute_write_fn(
-            apply_google_auth_migrations
+            apply_google_credentials_migrations
         )
 
     return inner

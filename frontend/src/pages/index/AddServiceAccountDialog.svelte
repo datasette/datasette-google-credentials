@@ -28,7 +28,7 @@
     busy = true;
     error = null;
     const result = await api(
-      client.POST("/-/google-auth/api/service-accounts", {
+      client.POST("/-/google-credentials/api/service-accounts", {
         body: { label, key_json: keyJson },
       }),
     );

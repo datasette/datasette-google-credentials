@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-  "/-/google-auth/api/status": {
+  "/-/google-credentials/api/status": {
     parameters: {
       query?: never;
       header?: never;
@@ -54,7 +54,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/api/credentials": {
+  "/-/google-credentials/api/credentials": {
     parameters: {
       query?: never;
       header?: never;
@@ -92,7 +92,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/api/admin/credentials": {
+  "/-/google-credentials/api/admin/credentials": {
     parameters: {
       query?: never;
       header?: never;
@@ -134,7 +134,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/api/service-accounts": {
+  "/-/google-credentials/api/service-accounts": {
     parameters: {
       query?: never;
       header?: never;
@@ -203,7 +203,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/api/credentials/{credential_id}/rename": {
+  "/-/google-credentials/api/credentials/{credential_id}/rename": {
     parameters: {
       query?: never;
       header?: never;
@@ -264,7 +264,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/api/credentials/{credential_id}/rotate-key": {
+  "/-/google-credentials/api/credentials/{credential_id}/rotate-key": {
     parameters: {
       query?: never;
       header?: never;
@@ -328,7 +328,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/api/credentials/{credential_id}/delete": {
+  "/-/google-credentials/api/credentials/{credential_id}/delete": {
     parameters: {
       query?: never;
       header?: never;
@@ -400,7 +400,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth": {
+  "/-/google-credentials": {
     parameters: {
       query?: never;
       header?: never;
@@ -433,7 +433,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/admin": {
+  "/-/google-credentials/admin": {
     parameters: {
       query?: never;
       header?: never;
@@ -466,7 +466,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/connect": {
+  "/-/google-credentials/connect": {
     parameters: {
       query?: never;
       header?: never;
@@ -499,7 +499,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/-/google-auth/oauth/callback": {
+  "/-/google-credentials/oauth/callback": {
     parameters: {
       query?: never;
       header?: never;
@@ -573,7 +573,7 @@ export interface components {
     };
     /**
      * AdminCredentialInfo
-     * @description One credential as a ``google-auth-admin`` sees it in the "All
+     * @description One credential as a ``google-credentials-admin`` sees it in the "All
      *     credentials" view (ticket 15): ``CredentialInfo`` plus who owns it and
      *     who used it last. Information only: it never grants use (D6).
      */

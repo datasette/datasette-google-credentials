@@ -28,7 +28,7 @@ export type Credentials = AdminCredentialInfo[];
 export type ManageUrl = string;
 
 /**
- * The ``/-/google-auth/admin`` "All credentials" page (ticket 15).
+ * The ``/-/google-credentials/admin`` "All credentials" page (ticket 15).
  * Information only: nothing here lets the admin use a credential (D6).
  */
 export interface AdminPageData {
@@ -52,7 +52,7 @@ export interface StatusResponse {
   [k: string]: unknown;
 }
 /**
- * One credential as a ``google-auth-admin`` sees it in the "All
+ * One credential as a ``google-credentials-admin`` sees it in the "All
  * credentials" view (ticket 15): ``CredentialInfo`` plus who owns it and
  * who used it last. Information only: it never grants use (D6).
  */

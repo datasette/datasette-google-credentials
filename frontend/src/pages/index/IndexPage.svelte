@@ -46,7 +46,9 @@
   );
 
   async function refresh() {
-    const result = await api(client.GET("/-/google-auth/api/credentials"));
+    const result = await api(
+      client.GET("/-/google-credentials/api/credentials"),
+    );
     if (result.data) {
       credentials = result.data.credentials;
     } else {
@@ -59,7 +61,7 @@
   }
 </script>
 
-<div class="google-auth-page">
+<div class="google-credentials-page">
   <h1>Google accounts</h1>
 
   {#if pageData.admin_url}

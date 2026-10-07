@@ -15,7 +15,7 @@ export default defineConfig({
   plugins: [svelte()],
   build: {
     manifest: "manifest.json",
-    outDir: "../datasette_google_auth",
+    outDir: "../datasette_google_credentials",
     // outDir is the Python package itself: never wipe it.
     emptyOutDir: false,
     assetsDir: "static/gen",

@@ -19,7 +19,7 @@ const DEMO_KEY = JSON.stringify(
 
 export default defineShot({
   name: "add-service-account",
-  path: "/-/google-auth",
+  path: "/-/google-credentials",
   capture: "viewport",
   async prepare(page) {
     await page.getByRole("button", { name: "Add service account" }).click();

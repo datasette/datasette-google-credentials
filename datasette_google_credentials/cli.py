@@ -1,4 +1,4 @@
-"""``datasette google-auth ...`` commands, registered by ``register_commands``.
+"""``datasette google-credentials ...`` commands, registered by ``register_commands``.
 
 - ``generate-key`` prints a new Fernet key for ``encryption-key``.
 - ``rotate-keys`` re-encrypts every stored credential with the first
@@ -16,12 +16,12 @@ import click
 from cryptography.fernet import Fernet
 
 
-@click.group(name="google-auth")
-def google_auth():
-    "Commands for datasette-google-auth"
+@click.group(name="google-credentials")
+def google_credentials():
+    "Commands for datasette-google-credentials"
 
 
-@google_auth.command(name="generate-key")
+@google_credentials.command(name="generate-key")
 def generate_key():
     """Print a new encryption key for the encryption-key setting.
 
@@ -31,7 +31,7 @@ def generate_key():
     click.echo(Fernet.generate_key().decode())
 
 
-@google_auth.command(name="rotate-keys")
+@google_credentials.command(name="rotate-keys")
 @click.option(
     "--internal",
     required=True,

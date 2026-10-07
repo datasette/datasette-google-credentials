@@ -3,9 +3,9 @@
 
 Flow::
 
-    GET /-/google-auth/connect?return_to=/some/path     start_connect()
+    GET /-/google-credentials/connect?return_to=/some/path     start_connect()
       -> 302 Google consent screen (PKCE S256, signed state)
-    GET /-/google-auth/oauth/callback?code=...&state=...  finish_connect()
+    GET /-/google-credentials/oauth/callback?code=...&state=...  finish_connect()
       -> code exchange, userinfo, upsert by (owner, sub), 302 return_to
 
 Forgery defences, in the order the callback checks them:
@@ -14,7 +14,7 @@ Forgery defences, in the order the callback checks them:
   "t": issued_at}, namespace=STATE_NAMESPACE)``: tamper-proof, and bound to
   the actor who started the flow and to a 10-minute window.
 * The nonce must match the one in the flow cookie (``FLOW_COOKIE``: signed,
-  HttpOnly, SameSite=Lax, 10 minutes, scoped to ``/-/google-auth/``), so a
+  HttpOnly, SameSite=Lax, 10 minutes, scoped to ``/-/google-credentials/``), so a
   state lifted from someone else's browser is useless without their cookie.
 * The PKCE ``code_verifier`` lives only in that cookie; Google refuses the
   code exchange without it.
@@ -77,15 +77,15 @@ if TYPE_CHECKING:
 
 TYPE = "google_oauth"
 
-CONNECT_PATH = "/-/google-auth/connect"
-CALLBACK_PATH = "/-/google-auth/oauth/callback"
-DEFAULT_RETURN_TO = "/-/google-auth"
+CONNECT_PATH = "/-/google-credentials/connect"
+CALLBACK_PATH = "/-/google-credentials/oauth/callback"
+DEFAULT_RETURN_TO = "/-/google-credentials"
 # The flow cookie is only sent to our own routes.
-COOKIE_PATH = "/-/google-auth/"
+COOKIE_PATH = "/-/google-credentials/"
 
-STATE_NAMESPACE = "google-auth-oauth"
-FLOW_COOKIE = "google_auth_oauth"
-FLOW_COOKIE_NAMESPACE = "google-auth-oauth-flow"
+STATE_NAMESPACE = "google-credentials-oauth"
+FLOW_COOKIE = "google_credentials_oauth"
+FLOW_COOKIE_NAMESPACE = "google-credentials-oauth-flow"
 FLOW_MAX_AGE = 600
 """Seconds a connect attempt stays valid: the cookie's max-age and the
 state's maximum age."""
@@ -307,7 +307,7 @@ async def _error_page(
 
 
 async def start_connect(datasette: Datasette, request: Request) -> Response:
-    """``GET /-/google-auth/connect?return_to=/path``: redirect to Google."""
+    """``GET /-/google-credentials/connect?return_to=/path``: redirect to Google."""
     actor_id = await _require_connect(datasette, request)
     try:
         require_box(datasette)
@@ -367,7 +367,7 @@ def _check_state(
 
 
 async def finish_connect(datasette: Datasette, request: Request) -> Response:
-    """``GET /-/google-auth/oauth/callback``: Google redirects back here."""
+    """``GET /-/google-credentials/oauth/callback``: Google redirects back here."""
     actor_id = await _require_connect(datasette, request)
     with callback_span() as callback:
         return await _finish_connect(datasette, request, actor_id, callback)

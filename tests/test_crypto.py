@@ -10,7 +10,7 @@ from datasette.app import Datasette
 from datasette.cli import cli
 from datasette.utils import StartupError
 
-from datasette_google_auth.crypto import (
+from datasette_google_credentials.crypto import (
     InvalidEncryptionKey,
     SecretBox,
     decrypt_credential,
@@ -19,12 +19,12 @@ from datasette_google_auth.crypto import (
     require_box,
     rotate_all_credentials,
 )
-from datasette_google_auth.errors import (
+from datasette_google_credentials.errors import (
     CredentialUndecryptable,
     EncryptionNotConfigured,
-    GoogleAuthError,
+    GoogleCredentialsError,
 )
-from datasette_google_auth.internal_db import TABLE, InternalDB
+from datasette_google_credentials.internal_db import TABLE, InternalDB
 
 KEY_NEW = Fernet.generate_key().decode()
 KEY_OLD = Fernet.generate_key().decode()
@@ -47,7 +47,9 @@ OAUTH_SECRET = {"refresh_token": REFRESH_TOKEN}
 
 
 def plugin_config(encryption_key):
-    return {"plugins": {"datasette-google-auth": {"encryption-key": encryption_key}}}
+    return {
+        "plugins": {"datasette-google-credentials": {"encryption-key": encryption_key}}
+    }
 
 
 async def started(encryption_key=None, internal=None):
@@ -151,7 +153,7 @@ async def test_invalid_key_fails_startup(encryption_key, where):
     with pytest.raises(StartupError) as excinfo:
         await started(encryption_key)
     message = str(excinfo.value)
-    assert "datasette-google-auth" in message
+    assert "datasette-google-credentials" in message
     assert where in message
     assert "not-a-fernet-key-but-a-secret" not in message
     assert KEY_NEW not in message
@@ -175,14 +177,14 @@ async def test_valid_keys_build_box():
 async def test_no_key_gives_none_and_writes_refuse(encryption_key):
     datasette = await started(encryption_key)
     assert get_box(datasette) is None
-    message = "datasette-google-auth needs `encryption-key` configured"
+    message = "datasette-google-credentials needs `encryption-key` configured"
     with pytest.raises(EncryptionNotConfigured, match=message):
         require_box(datasette)
     with pytest.raises(EncryptionNotConfigured, match=message):
         encrypt_secret(datasette, SA_SECRET)
     with pytest.raises(EncryptionNotConfigured):
         await rotate_all_credentials(datasette)
-    assert issubclass(EncryptionNotConfigured, GoogleAuthError)
+    assert issubclass(EncryptionNotConfigured, GoogleCredentialsError)
 
 
 @pytest.mark.asyncio
@@ -280,7 +282,7 @@ async def test_wrong_key_maps_to_credential_error(tmp_path):
     with pytest.raises(CredentialUndecryptable) as excinfo:
         await decrypt_credential(datasette, row)
     error = excinfo.value
-    assert isinstance(error, GoogleAuthError)
+    assert isinstance(error, GoogleCredentialsError)
     assert error.credential_id == row.id
     message = str(error)
     assert "cannot decrypt — was encryption-key changed?" in message
@@ -350,19 +352,19 @@ async def test_raw_row_is_encrypted(tmp_path):
 
 def test_cli_generate_key():
     runner = CliRunner()
-    result = runner.invoke(cli, ["google-auth", "generate-key"])
+    result = runner.invoke(cli, ["google-credentials", "generate-key"])
     assert result.exit_code == 0, result.output
     key = result.output.strip()
     assert result.output == key + "\n"
     # A valid Fernet key
     SecretBox([key])
     assert len(base64.urlsafe_b64decode(key)) == 32
-    again = runner.invoke(cli, ["google-auth", "generate-key"]).output.strip()
+    again = runner.invoke(cli, ["google-credentials", "generate-key"]).output.strip()
     assert again != key
 
 
 def test_cli_group_help():
-    result = CliRunner().invoke(cli, ["google-auth", "--help"])
+    result = CliRunner().invoke(cli, ["google-credentials", "--help"])
     assert result.exit_code == 0
     assert "generate-key" in result.output
     assert "rotate-keys" in result.output
@@ -397,7 +399,7 @@ def test_cli_rotate_keys_with_config_file(tmp_path):
     config = write_config(tmp_path, [KEY_NEW, KEY_OLD])
 
     result = CliRunner().invoke(
-        cli, ["google-auth", "rotate-keys", "--internal", internal, "-c", config]
+        cli, ["google-credentials", "rotate-keys", "--internal", internal, "-c", config]
     )
     assert result.exit_code == 0, result.output
     assert "Re-encrypted 2 credential(s)" in result.output
@@ -411,7 +413,7 @@ def test_cli_rotate_keys_with_config_file(tmp_path):
 
     # Running again is a no-op
     again = CliRunner().invoke(
-        cli, ["google-auth", "rotate-keys", "--internal", internal, "-c", config]
+        cli, ["google-credentials", "rotate-keys", "--internal", internal, "-c", config]
     )
     assert again.exit_code == 0, again.output
     assert "Re-encrypted 0 credential(s)" in again.output
@@ -422,19 +424,22 @@ def test_cli_rotate_keys_with_config_file(tmp_path):
 def test_cli_rotate_keys_with_settings_and_env(tmp_path, monkeypatch):
     internal = str(tmp_path / "internal.db")
     rows = seed_old_key_rows(internal, count=1)
-    monkeypatch.setenv("TEST_GOOGLE_AUTH_NEW", KEY_NEW)
-    monkeypatch.setenv("TEST_GOOGLE_AUTH_OLD", KEY_OLD)
+    monkeypatch.setenv("TEST_GOOGLE_CREDENTIALS_NEW", KEY_NEW)
+    monkeypatch.setenv("TEST_GOOGLE_CREDENTIALS_OLD", KEY_OLD)
     result = CliRunner().invoke(
         cli,
         [
-            "google-auth",
+            "google-credentials",
             "rotate-keys",
             "--internal",
             internal,
             "-s",
-            "plugins.datasette-google-auth.encryption-key",
+            "plugins.datasette-google-credentials.encryption-key",
             json.dumps(
-                [{"$env": "TEST_GOOGLE_AUTH_NEW"}, {"$env": "TEST_GOOGLE_AUTH_OLD"}]
+                [
+                    {"$env": "TEST_GOOGLE_CREDENTIALS_NEW"},
+                    {"$env": "TEST_GOOGLE_CREDENTIALS_OLD"},
+                ]
             ),
         ],
     )
@@ -449,7 +454,7 @@ def test_cli_rotate_keys_reports_undecryptable(tmp_path):
     before = read_secrets(internal)
     config = write_config(tmp_path, [KEY_NEW, KEY_OTHER])
     result = CliRunner().invoke(
-        cli, ["google-auth", "rotate-keys", "--internal", internal, "-c", config]
+        cli, ["google-credentials", "rotate-keys", "--internal", internal, "-c", config]
     )
     assert result.exit_code == 1
     assert "1 credential(s) could not be decrypted" in result.output
@@ -462,7 +467,7 @@ def test_cli_rotate_keys_refuses_without_key(tmp_path):
     internal = str(tmp_path / "internal.db")
     seed_old_key_rows(internal, count=1)
     result = CliRunner().invoke(
-        cli, ["google-auth", "rotate-keys", "--internal", internal]
+        cli, ["google-credentials", "rotate-keys", "--internal", internal]
     )
     assert result.exit_code == 1
     assert "needs `encryption-key` configured" in result.output
@@ -473,7 +478,7 @@ def test_cli_rotate_keys_bad_key_never_echoed(tmp_path):
     seed_old_key_rows(internal, count=1)
     config = write_config(tmp_path, [KEY_NEW, "not-a-fernet-key-but-a-secret"])
     result = CliRunner().invoke(
-        cli, ["google-auth", "rotate-keys", "--internal", internal, "-c", config]
+        cli, ["google-credentials", "rotate-keys", "--internal", internal, "-c", config]
     )
     assert result.exit_code == 1
     assert "encryption-key: key 2 of 2 is not a valid Fernet key" in result.output
@@ -484,7 +489,12 @@ def test_cli_rotate_keys_bad_key_never_echoed(tmp_path):
 def test_cli_rotate_keys_requires_existing_internal_db(tmp_path):
     result = CliRunner().invoke(
         cli,
-        ["google-auth", "rotate-keys", "--internal", str(tmp_path / "missing.db")],
+        [
+            "google-credentials",
+            "rotate-keys",
+            "--internal",
+            str(tmp_path / "missing.db"),
+        ],
     )
     assert result.exit_code == 2
     assert not (tmp_path / "missing.db").exists()

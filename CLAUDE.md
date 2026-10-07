@@ -1,4 +1,4 @@
-# datasette-google-auth
+# datasette-google-credentials
 
 Google credentials for Datasette. Stores service-account keys (shared through
 datasette-acl) and per-user OAuth connections (owner-only), encrypted at rest,
@@ -29,6 +29,11 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 `[tool.uv.sources]`). datasette-acl must be on a branch with the
 `datasette_acl.grants` Principal API (`main` or `grant-event`).
 
+The plugin was renamed from `datasette-google-auth` before any release (no
+compat aliases). `../datasette-google-sheets` is the one real consumer: it takes
+this repo as a path source and imports `datasette_google_credentials`, so
+renames of public API names need a matching change there.
+
 ## Commands
 
 | Command | What it does |
@@ -48,21 +53,21 @@ Nothing is exposed in SQL. Importer and exporter samples in `samples/` prove the
 | `just shots [names]` | Rebuild the frontend and regenerate `docs/screenshots/*.png` (Playwright; throwaway seeded servers, never contacts Google) |
 | `just dev-otel` | `just dev` plus `../datasette-otel-viewer` (spans and metrics at `/-/otel`) |
 | `just telemetry-doc` / `telemetry-doc-check` | Regenerate / verify README's telemetry reference from the registry |
-| `uv run datasette google-auth generate-key` | Print a new Fernet key for `encryption-key` |
-| `uv run datasette google-auth rotate-keys --internal X -c cfg.yml` | Re-encrypt every credential with the first key |
+| `uv run datasette google-credentials generate-key` | Print a new Fernet key for `encryption-key` |
+| `uv run datasette google-credentials rotate-keys --internal X -c cfg.yml` | Re-encrypt every credential with the first key |
 
 ## Project Structure
 
 ```
-datasette_google_auth/
+datasette_google_credentials/
 ├── __init__.py              # Plugin hooks + re-exports the public broker API (`__all__`)
-├── admin.py                 # list_all_credentials: google-auth-admin's info-only view (never grants use)
+├── admin.py                 # list_all_credentials: google-credentials-admin's info-only view (never grants use)
 ├── broker.py                # list_credentials / get_credential / Credential.token() + .request()
-├── cli.py                   # `datasette google-auth generate-key | rotate-keys`
+├── cli.py                   # `datasette google-credentials generate-key | rotate-keys`
 ├── config.py                # Pydantic plugin config, validated at startup
 ├── crypto.py                # SecretBox (Fernet/MultiFernet), encrypt/decrypt + lazy key rotation
-├── errors.py                # GoogleAuthError + subclasses (stable `code`), error_response()
-├── events.py                # The five google-auth-credential-* events + mark_broken (CAS, evict, event)
+├── errors.py                # GoogleCredentialsError + subclasses (stable `code`), error_response()
+├── events.py                # The five google-credential-* events + mark_broken (CAS, evict, event)
 ├── http.py                  # client(datasette): the only outbound httpx2 factory
 ├── internal_migrations.py   # sqlite-migrate: credentials table (append-only)
 ├── internal_db.py           # InternalDB + CredentialRow (never decrypts)
@@ -80,11 +85,11 @@ datasette_google_auth/
 ├── token_cache.py           # TokenCache (in-memory, per-process, LRU) + get_token_cache(datasette)
 └── routes/
     ├── pages.py             # Page routes (render HTML) + OAuth connect/callback redirects
-    └── api.py               # JSON API (Pydantic in/out, OpenAPI); every GoogleAuthError → error_response
-└── templates/google_auth_base.html  # The one page template: Vite entry + #pageData + #app-root
+    └── api.py               # JSON API (Pydantic in/out, OpenAPI); every GoogleCredentialsError → error_response
+└── templates/google_credentials_base.html  # The one page template: Vite entry + #pageData + #app-root
 frontend/
 ├── api.d.ts                 # Generated from the OpenAPI document (committed)
-├── vite.config.ts           # Entries: index, admin; builds into datasette_google_auth/
+├── vite.config.ts           # Entries: index, admin; builds into datasette_google_credentials/
 └── src/
     ├── lib/api.ts           # Typed openapi-fetch `client` + `api()` result normalizer
     ├── lib/DeleteDialog.svelte, SetupNotices.svelte, page.css  # Shared by the index and admin pages
@@ -134,9 +139,9 @@ tests/
 
 ## Routes
 
-- `GET /-/google-auth/connect?return_to=/...` → start OAuth connect (404 without
-  `client_id`/`client_secret`, 403 without `google-auth-connect`)
-- `GET /-/google-auth/oauth/callback` → OAuth redirect URI
+- `GET /-/google-credentials/connect?return_to=/...` → start OAuth connect (404 without
+  `client_id`/`client_secret`, 403 without `google-credentials-connect`)
+- `GET /-/google-credentials/oauth/callback` → OAuth redirect URI
 - Samples (only with `--plugins-dir samples`): `GET|POST /-/google-sheets-import/<db>`,
   `GET|POST /-/google-sheets-export?database=..&table=..|sql=..` (service accounts
   export only into existing sheets shared with them as Editor, D28)
@@ -149,48 +154,48 @@ request the narrowest scope they need.
 JSON API (`routes/api.py`). Errors are `error_response()` JSON
 (`{ok: false, error, code, ...}`); ids the actor may not know about are 404.
 POSTs need no CSRF token (Datasette checks `Sec-Fetch-Site`/`Origin`).
-- `GET /-/google-auth/api/status` → setup-notice flags + permissions (any actor)
-- `GET /-/google-auth/api/credentials?scopes=a,b` → `{credentials: ListedCredential[]}`, mirrors `list_credentials()`;
+- `GET /-/google-credentials/api/status` → setup-notice flags + permissions (any actor)
+- `GET /-/google-credentials/api/credentials?scopes=a,b` → `{credentials: ListedCredential[]}`, mirrors `list_credentials()`;
   each item is a `CredentialInfo` plus the page's `role`, `can_edit`, `can_manage`, `last_used_at`, `missing_scopes`
-- `GET /-/google-auth/api/admin/credentials?owner=&type=&status=` → `{credentials: AdminCredentialInfo[], actor_names}`
-  (`google-auth-admin`, info only; `actor_names` = display names via core `actors_from_ids`, ids without one omitted)
-- `POST /-/google-auth/api/service-accounts` `{label?, key_json}` → CredentialInfo + `share_with_email`
-- `POST /-/google-auth/api/credentials/{id}/rename` `{label}` → CredentialInfo
-- `POST /-/google-auth/api/credentials/{id}/rotate-key` `{key_json}` → CredentialInfo
-- `POST /-/google-auth/api/credentials/{id}/delete` → DeleteResult
+- `GET /-/google-credentials/api/admin/credentials?owner=&type=&status=` → `{credentials: AdminCredentialInfo[], actor_names}`
+  (`google-credentials-admin`, info only; `actor_names` = display names via core `actors_from_ids`, ids without one omitted)
+- `POST /-/google-credentials/api/service-accounts` `{label?, key_json}` → CredentialInfo + `share_with_email`
+- `POST /-/google-credentials/api/credentials/{id}/rename` `{label}` → CredentialInfo
+- `POST /-/google-credentials/api/credentials/{id}/rotate-key` `{key_json}` → CredentialInfo
+- `POST /-/google-credentials/api/credentials/{id}/delete` → DeleteResult
 
 Pages (`routes/pages.py`, rendered by `render_page()`):
-- `GET /-/google-auth` → management page (403 for anonymous; any signed-in actor, who may have
+- `GET /-/google-credentials` → management page (403 for anonymous; any signed-in actor, who may have
   shared service accounts). Svelte app in `frontend/src/pages/index/`; dialogs use `lib/Modal.svelte`
-  (core `DatasetteModal`). Connect/Reconnect link to `/-/google-auth/connect?return_to=/-/google-auth`;
+  (core `DatasetteModal`). Connect/Reconnect link to `/-/google-credentials/connect?return_to=/-/google-credentials`;
   the callback reports back through Datasette flash messages. Links admins to the admin page.
-- `GET /-/google-auth/admin` → "All Google credentials" (403 unless `google-auth-admin`). Svelte app in
+- `GET /-/google-credentials/admin` → "All Google credentials" (403 unless `google-credentials-admin`). Svelte app in
   `frontend/src/pages/admin/`: filters (in the browser, mirrored to `?owner=&type=&status=`) and Delete only;
   never use, rename or reconnect. No menu link (reached from the management page).
 
 ## Hooks Used
 
 - `register_routes()` — registers all routes from the shared router
-- `menu_links()` — "Google accounts" for signed-in actors holding any global google-auth action (`allowed_many`)
+- `menu_links()` — "Google accounts" for signed-in actors holding any global google-credentials action (`allowed_many`)
 - `extra_js_urls()` / `extra_css_urls()` — the `<datasette-acl-share-dialog>` bundle, on the management page only
-- `extra_template_vars()` — `datasette_google_auth_vite_entry` (datasette-vite)
-- `register_actions()` — three global actions (`google-auth-connect`,
-  `google-auth-add-service-account`, `google-auth-admin`) and three per-SA
+- `extra_template_vars()` — `datasette_google_credentials_vite_entry` (datasette-vite)
+- `register_actions()` — three global actions (`google-credentials-connect`,
+  `google-credentials-add-service-account`, `google-credentials-admin`) and three per-SA
   actions (`google-service-account-use` / `-edit` / `-manage`)
 - `datasette_acl_roles()` — User / Editor / Manager for `google-service-account`
-- `register_events()` — `google-auth-credential-created` / `-reconnected` / `-rotated` /
+- `register_events()` — `google-credential-created` / `-reconnected` / `-rotated` /
   `-deleted` / `-broken` (`events.py`; no per-use events, never secrets)
-- `register_commands()` — adds the `datasette google-auth` CLI group (`cli.py`)
+- `register_commands()` — adds the `datasette google-credentials` CLI group (`cli.py`)
 - `startup()` — validates plugin config and Fernet key format (bad config → `StartupError`), creates the per-process token cache, then applies internal-DB migrations
 
 ## Environment Variables
 
 - `DATASETTE_SECRET` — required for the dev server (`just dev` sets it)
-- `DATASETTE_GOOGLE_AUTH_KEY` — Fernet encryption key, usually wired as
-  `encryption-key: {"$env": "DATASETTE_GOOGLE_AUTH_KEY"}` (ticket 04)
-- `DATASETTE_GOOGLE_AUTH_LIVE_SA_KEY` (path to a key file) and
-  `DATASETTE_GOOGLE_AUTH_LIVE_SHEET` — only for `just test-live`
-- `DATASETTE_GOOGLE_AUTH_CLIENT_ID` / `_CLIENT_SECRET` — only for
+- `DATASETTE_GOOGLE_CREDENTIALS_KEY` — Fernet encryption key, usually wired as
+  `encryption-key: {"$env": "DATASETTE_GOOGLE_CREDENTIALS_KEY"}` (ticket 04)
+- `DATASETTE_GOOGLE_CREDENTIALS_LIVE_SA_KEY` (path to a key file) and
+  `DATASETTE_GOOGLE_CREDENTIALS_LIVE_SHEET` — only for `just test-live`
+- `DATASETTE_GOOGLE_CREDENTIALS_CLIENT_ID` / `_CLIENT_SECRET` — only for
   `tests/live/oauth-dev.yml` (the manual OAuth checklist)
 
 ## Invariants
@@ -220,7 +225,7 @@ Pages (`routes/pages.py`, rendered by `render_page()`):
 - **No `from __future__ import annotations` in `routes/`**: datasette-plugin-router reads real
   annotation objects (`Annotated[Model, Body()]`, `str` path params); string annotations silently
   drop the request body and path params.
-- **Route handlers never let a `GoogleAuthError` escape**: catch it and return `error_response()`.
+- **Route handlers never let a `GoogleCredentialsError` escape**: catch it and return `error_response()`.
   Handlers that take `key_json` also catch every other exception (log type + stack, never the message).
 - **httpx2, not httpx.**
 - **Svelte 5 runes**: `$state()`, `$derived()`, `$effect()`, `$props()`

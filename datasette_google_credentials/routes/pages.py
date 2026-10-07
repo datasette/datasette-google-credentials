@@ -1,20 +1,20 @@
 """Page routes (render HTML or redirect) on the shared router.
 
-Pages render ``google_auth_base.html`` with a Vite ``entrypoint`` and a
+Pages render ``google_credentials_base.html`` with a Vite ``entrypoint`` and a
 ``page_data`` model from ``page_data.py``. ``index`` is the management page
 (ticket 14); its Svelte app is ``frontend/src/pages/index/``. ``admin`` is
-the ``google-auth-admin`` "All credentials" view (ticket 15,
+the ``google-credentials-admin`` "All credentials" view (ticket 15,
 ``frontend/src/pages/admin/``). The OAuth routes are browser
 redirects, not API calls, so they live here rather than under ``/api``; the
 flow itself is in ``oauth.py``, which turns the errors it expects into error
-pages. The ``GoogleAuthError`` catch here is a backstop: none may escape to
+pages. The ``GoogleCredentialsError`` catch here is a backstop: none may escape to
 Datasette, whose telemetry would record the message on the request span.
 """
 
 from datasette import Forbidden, Response
 from pydantic import BaseModel
 
-from ..errors import GoogleAuthError, error_response
+from ..errors import GoogleCredentialsError, error_response
 from ..oauth import DEFAULT_RETURN_TO, connect_url, finish_connect, start_connect
 from ..page_data import AdminPageData, IndexPageData, ShareDialog
 from ..router import router
@@ -22,8 +22,8 @@ from ..service import list_with_access
 from ..sharing import share_assets, share_features
 from .api import get_admin_credentials, get_status
 
-MANAGE_PATH = "/-/google-auth"
-ADMIN_PATH = "/-/google-auth/admin"
+MANAGE_PATH = "/-/google-credentials"
+ADMIN_PATH = "/-/google-credentials/admin"
 
 
 async def render_page(
@@ -33,7 +33,7 @@ async def render_page(
     (``src/pages/<name>/index.ts``, as in ``vite.config.ts``)."""
     return Response.html(
         await datasette.render_template(
-            "google_auth_base.html",
+            "google_credentials_base.html",
             {
                 "page_title": title,
                 "entrypoint": entrypoint,
@@ -44,18 +44,18 @@ async def render_page(
     )
 
 
-@router.GET(r"/-/google-auth$")
+@router.GET(r"/-/google-credentials$")
 async def index(datasette, request):
     """The management page. Anonymous actors get 403 (no login-URL API to
     redirect to, as D24). Any signed-in actor gets the page, even without a
-    google-auth action: they may have service accounts shared with them."""
+    google-credentials action: they may have service accounts shared with them."""
     actor = request.actor
     if not actor or actor.get("id") is None:
         raise Forbidden("Sign in to manage your Google accounts")
     try:
         status = await get_status(datasette, request)
         credentials = await list_with_access(datasette, actor)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     return await render_page(
         datasette,
@@ -77,9 +77,9 @@ async def index(datasette, request):
     )
 
 
-@router.GET(r"/-/google-auth/admin$")
+@router.GET(r"/-/google-credentials/admin$")
 async def admin(datasette, request):
-    """Every credential, for ``google-auth-admin`` holders only (403 for
+    """Every credential, for ``google-credentials-admin`` holders only (403 for
     everyone else, anonymous included). List and delete; never use, rename
     or reconnect someone else's credential (D6, D26)."""
     actor = request.actor
@@ -87,13 +87,13 @@ async def admin(datasette, request):
         raise Forbidden("Sign in to see all Google credentials")
     try:
         status = await get_status(datasette, request)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     if not status.is_admin:
         raise Forbidden("You don't have permission to see all Google credentials")
     try:
         listing = await get_admin_credentials(datasette, request)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     return await render_page(
         datasette,
@@ -109,17 +109,17 @@ async def admin(datasette, request):
     )
 
 
-@router.GET(r"/-/google-auth/connect$")
+@router.GET(r"/-/google-credentials/connect$")
 async def oauth_connect(datasette, request):
     try:
         return await start_connect(datasette, request)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
 
 
-@router.GET(r"/-/google-auth/oauth/callback$")
+@router.GET(r"/-/google-credentials/oauth/callback$")
 async def oauth_callback(datasette, request):
     try:
         return await finish_connect(datasette, request)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)

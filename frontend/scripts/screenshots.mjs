@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Documentation-screenshot harness for datasette-google-auth.
+// Documentation-screenshot harness for datasette-google-credentials.
 //
 //   node frontend/scripts/screenshots.mjs               # all shots
 //   node frontend/scripts/screenshots.mjs index admin   # a subset

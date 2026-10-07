@@ -8,7 +8,7 @@ Record each pass in the results table at the bottom.
 It needs the Google Cloud project and Sheets API from `SETUP.md` (steps 1 and 2).
 Steps 9 and 10 also use the service-account key and test sheet from `SETUP.md`.
 
-Where a step says "the management page", that's `/-/google-auth` (ticket 14).
+Where a step says "the management page", that's `/-/google-credentials` (ticket 14).
 Until it lands, use the fallbacks given in each step.
 
 ## Before you start
@@ -25,16 +25,16 @@ Put the OAuth client and a Fernet key in a file outside the repo (step 1 gives
 you the client values):
 
 ```sh
-# ~/.config/datasette-google-auth/oauth-env
-DATASETTE_GOOGLE_AUTH_KEY=...            # uv run datasette google-auth generate-key
-DATASETTE_GOOGLE_AUTH_CLIENT_ID=....apps.googleusercontent.com
-DATASETTE_GOOGLE_AUTH_CLIENT_SECRET=...
+# ~/.config/datasette-google-credentials/oauth-env
+DATASETTE_GOOGLE_CREDENTIALS_KEY=...            # uv run datasette google-credentials generate-key
+DATASETTE_GOOGLE_CREDENTIALS_CLIENT_ID=....apps.googleusercontent.com
+DATASETTE_GOOGLE_CREDENTIALS_CLIENT_SECRET=...
 ```
 
 Then start Datasette with that config, signed in as `root`:
 
 ```sh
-set -a; . ~/.config/datasette-google-auth/oauth-env; set +a
+set -a; . ~/.config/datasette-google-credentials/oauth-env; set +a
 just dev-otel -c tests/live/oauth-dev.yml --root
 ```
 
@@ -47,18 +47,18 @@ Two views used by several steps (neither shows secrets):
 
 ```sh
 # Stored credentials, from the internal DB
-sqlite3 -header .tmp/internal.db "select id, type, label, google_subject, google_email, scopes, status, status_detail from datasette_google_auth_credentials"
+sqlite3 -header .tmp/internal.db "select id, type, label, google_subject, google_email, scopes, status, status_detail from datasette_google_credentials"
 ```
 
-- `http://localhost:8021/-/google-auth/api/credentials`: what the broker offers
+- `http://localhost:8021/-/google-credentials/api/credentials`: what the broker offers
   `root` (`CredentialInfo`: label, email, scopes, status).
 
 ## 1. Create an OAuth client
 
 1. Get the redirect URI: the setup notice on the management page shows it, or
-   `http://localhost:8021/-/google-auth/api/status` returns it as
+   `http://localhost:8021/-/google-credentials/api/status` returns it as
    `redirect_uri`. It should be
-   `http://localhost:8021/-/google-auth/oauth/callback`.
+   `http://localhost:8021/-/google-credentials/oauth/callback`.
 2. In the console, open **Google Auth Platform** →
    [**Clients**](https://console.cloud.google.com/auth/clients) →
    **Create client** (older consoles: **APIs & Services** → **Credentials** →
@@ -91,7 +91,7 @@ is the default set.
 ## 3. Connect, and check `sub`, email and scopes
 
 1. Click **Connect Google** on the management page, or open
-   `http://localhost:8021/-/google-auth/connect?return_to=/-/google-auth`.
+   `http://localhost:8021/-/google-credentials/connect?return_to=/-/google-credentials`.
 2. Google shows the consent screen. With External/Testing it first warns
    "Google hasn't verified this app": **Continue**. Leave every box ticked and
    allow.
@@ -104,7 +104,7 @@ is the default set.
 - [ ] `scopes` holds `openid`, `https://www.googleapis.com/auth/userinfo.email`
       (Google's name for `email`) and `https://www.googleapis.com/auth/spreadsheets`.
       Write down exactly what Google returned: the mock should match it.
-- [ ] `/-/google-auth/api/credentials` lists it for `root`.
+- [ ] `/-/google-credentials/api/credentials` lists it for `root`.
 
 ## 4. Untick a scope during consent
 
@@ -150,7 +150,7 @@ is the default set.
    in the browser console on any `localhost:8021` page, with the row's `id`:
 
    ```js
-   await (await fetch("/-/google-auth/api/credentials/<id>/delete", {method: "POST"})).json()
+   await (await fetch("/-/google-credentials/api/credentials/<id>/delete", {method: "POST"})).json()
    ```
 
 - [ ] The result says `revoked: true` (the UI reports it) and the row is gone.
@@ -190,7 +190,7 @@ With the OAuth credential (steps 3 or 6):
 
 With the service account (add the `SETUP.md` key on the management page. Before
 ticket 14: `uv run datasette create-token root --secret abc123`, then
-`jq -n --rawfile k "$DATASETTE_GOOGLE_AUTH_LIVE_SA_KEY" '{key_json: $k}' | curl -s -X POST -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' --data @- http://localhost:8021/-/google-auth/api/service-accounts`):
+`jq -n --rawfile k "$DATASETTE_GOOGLE_CREDENTIALS_LIVE_SA_KEY" '{key_json: $k}' | curl -s -X POST -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' --data @- http://localhost:8021/-/google-credentials/api/service-accounts`):
 
 - [ ] The add response names `share_with_email` (the key's `client_email`).
 - [ ] Import the test sheet with it.
@@ -204,10 +204,10 @@ ticket 14: `uv run datasette create-token root --secret abc123`, then
 After steps 3 to 9, open `http://localhost:8021/-/otel`.
 
 - [ ] Spans are there for each path exercised:
-      `datasette_google_auth.oauth.callback` with `.oauth.exchange` and
+      `datasette_google_credentials.oauth.callback` with `.oauth.exchange` and
       `.oauth.userinfo` under it, `.token`, `.token.refresh` (OAuth),
       `.token.mint` (service account), `.request`, `.oauth.revoke` (step 7).
-- [ ] Metrics: `datasette_google_auth.google.duration`, `.token_cache.lookups`,
+- [ ] Metrics: `datasette_google_credentials.google.duration`, `.token_cache.lookups`,
       `.request.duration`, `.oauth.callbacks`, `.credentials.broken` (step 5).
 - [ ] `.request` spans carry the host (`sheets.googleapis.com`), never a path
       or spreadsheet ID. No span or metric carries an email, actor id, token or

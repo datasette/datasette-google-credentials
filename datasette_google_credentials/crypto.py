@@ -5,7 +5,7 @@ encrypted with Fernet into ``secret_encrypted``. ``encryption-key`` may be a
 list: the first key encrypts, every key decrypts (``MultiFernet``), so a key
 can be rotated by prepending a new one. Rows still under an old key are
 re-encrypted lazily when read (``decrypt_credential``), or all at once with
-``datasette google-auth rotate-keys`` (``rotate_all_credentials``).
+``datasette google-credentials rotate-keys`` (``rotate_all_credentials``).
 
 Nothing here logs, and no error message includes a key, a token or
 ciphertext.
@@ -51,7 +51,7 @@ class SecretBox:
                 raise InvalidEncryptionKey(
                     f"{where} is not a valid Fernet key (expected 32 url-safe"
                     " base64-encoded bytes). Generate one with"
-                    " `datasette google-auth generate-key`."
+                    " `datasette google-credentials generate-key`."
                 ) from None
         self._primary = fernets[0]
         self._f = MultiFernet(fernets)

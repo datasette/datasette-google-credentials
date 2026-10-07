@@ -6,7 +6,7 @@ import { defineShot } from "../defineShot.mjs";
 
 export default defineShot({
   name: "share-dialog",
-  path: "/-/google-auth",
+  path: "/-/google-credentials",
   capture: "viewport",
   async prepare(page) {
     await page.locator(".cards > li").nth(3).waitFor();

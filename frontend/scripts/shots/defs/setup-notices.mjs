@@ -6,7 +6,7 @@ import { defineShot } from "../defineShot.mjs";
 export default defineShot({
   name: "setup-notices",
   server: "setup",
-  path: "/-/google-auth",
+  path: "/-/google-credentials",
   async prepare(page) {
     await page.locator(".notice").nth(2).waitFor();
   },

@@ -23,7 +23,7 @@ from ulid import ULID
 if TYPE_CHECKING:
     from datasette.database import Database
 
-TABLE = "datasette_google_auth_credentials"
+TABLE = "datasette_google_credentials"
 
 # The schema leaves `type` unconstrained so new types need no table rebuild;
 # this is the only place the allowed values live.
@@ -35,7 +35,7 @@ NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
 
 
 class CredentialRow(BaseModel):
-    """One row of ``datasette_google_auth_credentials``."""
+    """One row of ``datasette_google_credentials``."""
 
     model_config = ConfigDict(frozen=True)
 

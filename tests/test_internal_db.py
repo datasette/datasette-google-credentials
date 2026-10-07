@@ -5,12 +5,12 @@ import pytest_asyncio
 from datasette.app import Datasette
 from sqlite_utils import Database as SqliteUtilsDatabase
 
-from datasette_google_auth.internal_db import (
+from datasette_google_credentials.internal_db import (
     TABLE,
     CredentialRow,
     InternalDB,
 )
-from datasette_google_auth.internal_migrations import (
+from datasette_google_credentials.internal_migrations import (
     internal_migrations,
     m001_credentials,
 )
@@ -70,14 +70,14 @@ async def test_startup_creates_table_and_indexes(datasette):
     ).rows
     by_name = {row["name"]: row for row in rows}
     assert by_name[TABLE]["type"] == "table"
-    unique = by_name["datasette_google_auth_credentials_oauth_unique"]
+    unique = by_name["datasette_google_credentials_oauth_unique"]
     assert "UNIQUE" in unique["sql"]
     assert "WHERE type = 'google_oauth'" in unique["sql"]
-    assert by_name["datasette_google_auth_credentials_owner"]["type"] == "index"
+    assert by_name["datasette_google_credentials_owner"]["type"] == "index"
     applied = (
         await db.execute(
             "SELECT name FROM _sqlite_migrations WHERE migration_set = ?",
-            ["datasette-google-auth.internal"],
+            ["datasette-google-credentials.internal"],
         )
     ).rows
     assert [row["name"] for row in applied] == ["m001_credentials"]

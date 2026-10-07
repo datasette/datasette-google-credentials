@@ -10,8 +10,8 @@ import re
 import pytest
 from cryptography.fernet import Fernet
 
-from datasette_google_auth.page_data import IndexPageData
-from datasette_google_auth.permissions import ADD_SERVICE_ACCOUNT, ADMIN, CONNECT
+from datasette_google_credentials.page_data import IndexPageData
+from datasette_google_credentials.permissions import ADD_SERVICE_ACCOUNT, ADMIN, CONNECT
 
 DEV_PORT = 5187
 
@@ -27,7 +27,7 @@ async def make_datasette(mock_google):
             },
             "plugins": {
                 "datasette-vite": {
-                    "dev_ports": {"datasette_google_auth": DEV_PORT},
+                    "dev_ports": {"datasette_google_credentials": DEV_PORT},
                 }
             },
         },
@@ -45,7 +45,7 @@ def cookies(datasette, actor):
 async def test_index_page_renders_vite_entry_and_page_data(mock_google, actor):
     datasette = await make_datasette(mock_google)
     response = await datasette.client.get(
-        "/-/google-auth", cookies=cookies(datasette, actor)
+        "/-/google-credentials", cookies=cookies(datasette, actor)
     )
     assert response.status_code == 200
     html = response.text
@@ -65,19 +65,20 @@ async def test_index_page_renders_vite_entry_and_page_data(mock_google, actor):
 
 @pytest.mark.asyncio
 async def test_index_page_forbidden_for_anonymous(mock_google):
-    # Signed-in actors without a google-auth action get the page (ticket 14,
+    # Signed-in actors without a google-credentials action get the page (ticket 14,
     # tests/test_pages.py): shared service accounts are listed there.
     datasette = await make_datasette(mock_google)
-    response = await datasette.client.get("/-/google-auth")
+    response = await datasette.client.get("/-/google-credentials")
     assert response.status_code == 403
     assert 'id="pageData"' not in response.text
 
 
 @pytest.mark.asyncio
 async def test_oauth_routes_still_distinct_from_page(mock_google):
-    # The page's `$`-anchored route must not swallow /-/google-auth/...
+    # The page's `$`-anchored route must not swallow /-/google-credentials/...
     datasette = await make_datasette(mock_google)
     response = await datasette.client.get(
-        "/-/google-auth/oauth/callback", cookies=cookies(datasette, {"id": "alice"})
+        "/-/google-credentials/oauth/callback",
+        cookies=cookies(datasette, {"id": "alice"}),
     )
     assert 'id="pageData"' not in response.text

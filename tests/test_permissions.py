@@ -5,9 +5,9 @@ from datasette_acl.grants import Principal, grant
 from datasette_acl.roles import roles_for
 from datasette_acl.utils import resource_exists
 
-from datasette_google_auth import CredentialNotFound, get_credential
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.permissions import (
+from datasette_google_credentials import CredentialNotFound, get_credential
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     CONNECT,

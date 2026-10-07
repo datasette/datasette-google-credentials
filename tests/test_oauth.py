@@ -13,15 +13,15 @@ from mock_google.oauth import (
     s256,
 )
 
-from datasette_google_auth import oauth
-from datasette_google_auth.crypto import decrypt_credential, encrypt_secret
-from datasette_google_auth.errors import (
+from datasette_google_credentials import oauth
+from datasette_google_credentials.crypto import decrypt_credential, encrypt_secret
+from datasette_google_credentials.errors import (
     CredentialBroken,
     CredentialChanged,
     CredentialNotFound,
 )
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.oauth import (
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.oauth import (
     FLOW_COOKIE,
     FLOW_COOKIE_NAMESPACE,
     STATE_NAMESPACE,
@@ -31,8 +31,8 @@ from datasette_google_auth.oauth import (
     safe_return_to,
     sign_state,
 )
-from datasette_google_auth.permissions import CONNECT
-from datasette_google_auth.token_cache import get_token_cache
+from datasette_google_credentials.permissions import CONNECT
+from datasette_google_credentials.token_cache import get_token_cache
 
 ALICE = {"id": "alice"}
 BOB = {"id": "bob"}
@@ -67,7 +67,8 @@ def path_and_query(url: str) -> str:
 async def start(datasette, actor=ALICE, return_to="/data"):
     """GET /connect: returns (authorize URL, flow cookie value)."""
     response = await datasette.client.get(
-        "/-/google-auth/connect?" + urlencode({"return_to": return_to}), actor=actor
+        "/-/google-credentials/connect?" + urlencode({"return_to": return_to}),
+        actor=actor,
     )
     assert response.status_code == 302
     return response.headers["location"], response.cookies[FLOW_COOKIE]
@@ -114,7 +115,7 @@ def cleared_flow_cookie(response) -> bool:
 async def test_connect_redirects_to_google_with_pkce_and_state(mock_google):
     datasette = await make_datasette(mock_google)
     response = await datasette.client.get(
-        "/-/google-auth/connect?return_to=/data/t", actor=ALICE
+        "/-/google-credentials/connect?return_to=/data/t", actor=ALICE
     )
     assert response.status_code == 302
     location = response.headers["location"]
@@ -148,7 +149,7 @@ async def test_connect_redirects_to_google_with_pkce_and_state(mock_google):
     assert "HttpOnly" in cookie_header
     assert "SameSite=lax" in cookie_header
     assert "Max-Age=600" in cookie_header
-    assert "Path=/-/google-auth/" in cookie_header
+    assert "Path=/-/google-credentials/" in cookie_header
 
 
 @pytest.mark.asyncio
@@ -279,7 +280,7 @@ async def test_tampered_state(mock_google):
         + params["state"][-1]
     )
     response = await callback(
-        datasette, "/-/google-auth/oauth/callback?" + urlencode(params), cookie
+        datasette, "/-/google-credentials/oauth/callback?" + urlencode(params), cookie
     )
     await assert_rejected(datasette, response, "invalid")
     assert not mock_google.calls("/token")
@@ -294,7 +295,7 @@ async def test_state_signed_for_different_return_to_rejected(mock_google):
     params = query(await consent(mock_google, authorize_url))
     params["state"] = datasette.sign({"a": "alice", "r": "/", "n": "x", "t": 0})
     response = await callback(
-        datasette, "/-/google-auth/oauth/callback?" + urlencode(params), cookie
+        datasette, "/-/google-credentials/oauth/callback?" + urlencode(params), cookie
     )
     await assert_rejected(datasette, response, "invalid")
 
@@ -309,7 +310,7 @@ async def test_expired_state(mock_google):
         datasette, FlowState("alice", "/data", old["n"], int(time.time()) - 601)
     )
     response = await callback(
-        datasette, "/-/google-auth/oauth/callback?" + urlencode(params), cookie
+        datasette, "/-/google-credentials/oauth/callback?" + urlencode(params), cookie
     )
     await assert_rejected(datasette, response, "expired")
     assert not mock_google.calls("/token")
@@ -382,7 +383,8 @@ async def test_access_denied_flashes_and_returns(mock_google):
 async def test_error_with_bad_state_is_not_redirected(mock_google):
     datasette = await make_datasette(mock_google)
     response = await datasette.client.get(
-        "/-/google-auth/oauth/callback?error=access_denied&state=nope", actor=ALICE
+        "/-/google-credentials/oauth/callback?error=access_denied&state=nope",
+        actor=ALICE,
     )
     assert response.status_code == 400
 
@@ -434,7 +436,7 @@ async def test_callback_never_echoes_secrets(mock_google):
 
 
 @pytest.mark.parametrize(
-    "path", ["/-/google-auth/connect", "/-/google-auth/oauth/callback"]
+    "path", ["/-/google-credentials/connect", "/-/google-credentials/oauth/callback"]
 )
 @pytest.mark.asyncio
 async def test_oauth_not_configured_is_404(mock_google, path):
@@ -445,7 +447,7 @@ async def test_oauth_not_configured_is_404(mock_google, path):
 
 @pytest.mark.parametrize("actor", [None, CAROL])
 @pytest.mark.parametrize(
-    "path", ["/-/google-auth/connect", "/-/google-auth/oauth/callback"]
+    "path", ["/-/google-credentials/connect", "/-/google-credentials/oauth/callback"]
 )
 @pytest.mark.asyncio
 async def test_needs_connect_permission(mock_google, actor, path):
@@ -461,14 +463,14 @@ async def test_connect_without_encryption_key(mock_google):
         config={"permissions": {CONNECT: {"id": "alice"}}}
     )
     await datasette.invoke_startup()
-    response = await datasette.client.get("/-/google-auth/connect", actor=ALICE)
+    response = await datasette.client.get("/-/google-credentials/connect", actor=ALICE)
     assert response.status_code == 503
     assert "encryption-key" in response.text
 
 
 @pytest.mark.asyncio
 async def test_redirect_uri_override(mock_google):
-    override = "https://datasette.example/-/google-auth/oauth/callback"
+    override = "https://datasette.example/-/google-credentials/oauth/callback"
     datasette = await make_datasette(mock_google, redirect_uri=override)
     authorize_url, _ = await start(datasette)
     assert query(authorize_url)["redirect_uri"] == override
@@ -495,7 +497,7 @@ async def test_redirect_uri_override(mock_google):
     ],
 )
 def test_safe_return_to_rejects(value):
-    assert safe_return_to(value) == "/-/google-auth"
+    assert safe_return_to(value) == "/-/google-credentials"
 
 
 @pytest.mark.parametrize("value", ["/", "/data", "/data/t?_sort=id&x=1#frag"])
@@ -511,10 +513,10 @@ async def test_open_redirect_falls_back(mock_google, return_to):
     datasette = await make_datasette(mock_google)
     authorize_url, _ = await start(datasette, return_to=return_to)
     state = datasette.unsign(query(authorize_url)["state"], namespace=STATE_NAMESPACE)
-    assert state["r"] == "/-/google-auth"
+    assert state["r"] == "/-/google-credentials"
     mock_google.oauth.deny = True
     response = await connect(datasette, mock_google, return_to=return_to)
-    assert response.headers["location"] == "/-/google-auth"
+    assert response.headers["location"] == "/-/google-credentials"
 
 
 # --- Refresh ----------------------------------------------------------------
@@ -557,7 +559,7 @@ async def test_refresh_invalid_grant_marks_broken(mock_google):
 
     assert excinfo.value.credential_id == row.id
     assert excinfo.value.detail == "Google access was revoked or expired — reconnect"
-    assert excinfo.value.reconnect_url == "/-/google-auth/connect"
+    assert excinfo.value.reconnect_url == "/-/google-credentials/connect"
     assert refresh_token not in str(excinfo.value)
     broken = await idb(datasette).get(row.id)
     assert broken is not None

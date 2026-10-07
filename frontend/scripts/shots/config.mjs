@@ -14,7 +14,7 @@ export const SEED_PLUGIN = resolve(HERE, "../../../scripts/shots_seed.py");
 export const OUT = resolve(HERE, "../../../docs/screenshots");
 export const out = (name) => resolve(OUT, `${name}.png`);
 
-// Every shot browses as alice (a google-auth-admin), via the seed plugin's
+// Every shot browses as alice (a google-credentials-admin), via the seed plugin's
 // actor_from_request header. No cookie signing needed.
 export const ACTOR_HEADER = "x-shots-actor";
 export const ACTOR = "alice";
@@ -29,7 +29,7 @@ export const LOCALE = "en-US";
 // Shown on the setup-notices shot instead of http://localhost:<free port>/…,
 // so the PNG doesn't depend on the port.
 export const DEMO_REDIRECT_URI =
-  "https://datasette.example.com/-/google-auth/oauth/callback";
+  "https://datasette.example.com/-/google-credentials/oauth/callback";
 
 // Google URLs for the seeded server: a closed local port, so nothing can
 // reach Google even if a shot clicked the wrong thing.

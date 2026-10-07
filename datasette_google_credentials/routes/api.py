@@ -1,7 +1,7 @@
 """JSON API routes on the shared router (D13, tickets 12 and 15).
 
 Handlers call the broker, service and admin layers, never ``InternalDB``,
-and turn every ``GoogleAuthError`` into ``error_response``'s JSON. None may
+and turn every ``GoogleCredentialsError`` into ``error_response``'s JSON. None may
 escape to Datasette: core's telemetry middleware would record its message
 (which can name a service account's ``client_email``) on the request span.
 Ids an actor may not know about are 404s, exactly as in the broker (no
@@ -30,7 +30,7 @@ from pydantic import BaseModel, ConfigDict, SecretStr
 
 from ..admin import actor_ids, actor_names, list_all_credentials
 from ..config import encryption_configured, get_config, oauth_configured
-from ..errors import GoogleAuthError, error_response
+from ..errors import GoogleCredentialsError, error_response
 from ..models import (
     AdminCredentialInfo,
     CredentialInfo,
@@ -130,7 +130,7 @@ def _key_error(what: str, ex: Exception) -> Response:
     """A 500 for an unexpected error while handling ``key_json``. Logs the
     exception type and stack (code lines only), never its message."""
     logger.error(
-        "datasette-google-auth: unexpected %s while %s\n%s",
+        "datasette-google-credentials: unexpected %s while %s\n%s",
         type(ex).__name__,
         what,
         "".join(traceback.format_tb(ex.__traceback__)),
@@ -174,7 +174,7 @@ async def get_admin_credentials(
     status: str | None = None,
 ) -> AdminCredentialListResponse:
     """The ``/api/admin/credentials`` listing; also the admin page's data.
-    Raises ``CredentialForbidden`` unless the actor holds ``google-auth-admin``."""
+    Raises ``CredentialForbidden`` unless the actor holds ``google-credentials-admin``."""
     credentials = await list_all_credentials(
         datasette, request.actor, owner=owner, type=type, status=status
     )
@@ -187,29 +187,29 @@ async def get_admin_credentials(
 # --- Routes -------------------------------------------------------------------
 
 
-@router.GET(r"/-/google-auth/api/status$", output=StatusResponse)
+@router.GET(r"/-/google-credentials/api/status$", output=StatusResponse)
 async def api_status(datasette, request):
     try:
         status = await get_status(datasette, request)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     return Response.json(status.model_dump())
 
 
-@router.GET(r"/-/google-auth/api/credentials$", output=CredentialListResponse)
+@router.GET(r"/-/google-credentials/api/credentials$", output=CredentialListResponse)
 async def api_credentials(datasette, request):
     # Anonymous actors get an empty list, not an error (as list_credentials).
     try:
         credentials = await list_with_access(
             datasette, request.actor, _scopes_arg(request)
         )
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     return Response.json(CredentialListResponse(credentials=credentials).model_dump())
 
 
 @router.GET(
-    r"/-/google-auth/api/admin/credentials$", output=AdminCredentialListResponse
+    r"/-/google-credentials/api/admin/credentials$", output=AdminCredentialListResponse
 )
 async def api_admin_credentials(datasette, request):
     try:
@@ -220,12 +220,14 @@ async def api_admin_credentials(datasette, request):
             type=request.args.get("type") or None,
             status=request.args.get("status") or None,
         )
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     return Response.json(listing.model_dump())
 
 
-@router.POST(r"/-/google-auth/api/service-accounts$", output=ServiceAccountCreated)
+@router.POST(
+    r"/-/google-credentials/api/service-accounts$", output=ServiceAccountCreated
+)
 async def api_add_service_account(
     datasette, request, body: Annotated[AddServiceAccountRequest, Body()]
 ):
@@ -234,7 +236,7 @@ async def api_add_service_account(
         info = await add_service_account(
             datasette, request.actor, body.key_json.get_secret_value(), label
         )
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     except Exception as ex:
         return _key_error("adding a service account", ex)
@@ -247,7 +249,7 @@ async def api_add_service_account(
 
 
 @router.POST(
-    r"/-/google-auth/api/credentials/(?P<credential_id>[^/]+)/rename$",
+    r"/-/google-credentials/api/credentials/(?P<credential_id>[^/]+)/rename$",
     output=CredentialInfo,
 )
 async def api_rename(
@@ -255,13 +257,13 @@ async def api_rename(
 ):
     try:
         info = await rename(datasette, request.actor, credential_id, body.label)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     return Response.json(info.model_dump())
 
 
 @router.POST(
-    r"/-/google-auth/api/credentials/(?P<credential_id>[^/]+)/rotate-key$",
+    r"/-/google-credentials/api/credentials/(?P<credential_id>[^/]+)/rotate-key$",
     output=CredentialInfo,
 )
 async def api_rotate_key(
@@ -271,7 +273,7 @@ async def api_rotate_key(
         info = await rotate_service_account_key(
             datasette, request.actor, credential_id, body.key_json.get_secret_value()
         )
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     except Exception as ex:
         return _key_error("rotating a service account key", ex)
@@ -279,12 +281,12 @@ async def api_rotate_key(
 
 
 @router.POST(
-    r"/-/google-auth/api/credentials/(?P<credential_id>[^/]+)/delete$",
+    r"/-/google-credentials/api/credentials/(?P<credential_id>[^/]+)/delete$",
     output=DeleteResult,
 )
 async def api_delete(datasette, request, credential_id: str):
     try:
         result = await delete(datasette, request.actor, credential_id)
-    except GoogleAuthError as ex:
+    except GoogleCredentialsError as ex:
         return error_response(ex)
     return Response.json(result.model_dump())

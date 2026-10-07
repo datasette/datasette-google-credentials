@@ -6,13 +6,13 @@ import pytest
 from datasette.app import Datasette
 from datasette.utils import StartupError
 
-from datasette_google_auth.config import (
+from datasette_google_credentials.config import (
     Config,
     encryption_configured,
     get_config,
     oauth_configured,
 )
-from datasette_google_auth.http import client, set_transport
+from datasette_google_credentials.http import client, set_transport
 
 # Obviously fake values; the assertions check they never leak. Keys must be
 # well-formed Fernet keys (32 url-safe base64 bytes) or startup rejects them.
@@ -24,7 +24,7 @@ FAKE_SECRET = "fake-client-secret-CCCCCCCC"
 def make_datasette(plugin_config):
     return Datasette(
         memory=True,
-        config={"plugins": {"datasette-google-auth": plugin_config}},
+        config={"plugins": {"datasette-google-credentials": plugin_config}},
     )
 
 
@@ -70,7 +70,7 @@ async def test_full_config():
             "encryption-key": FAKE_KEY,
             "client_id": "id.apps.googleusercontent.com",
             "client_secret": FAKE_SECRET,
-            "redirect_uri": "https://example.com/-/google-auth/oauth/callback",
+            "redirect_uri": "https://example.com/-/google-credentials/oauth/callback",
             "google_base_urls": {"oauth_token": "http://mock/token"},
         }
     )
@@ -78,7 +78,9 @@ async def test_full_config():
     assert config.encryption_keys == [FAKE_KEY]
     assert encryption_configured(config)
     assert oauth_configured(config)
-    assert config.redirect_uri == "https://example.com/-/google-auth/oauth/callback"
+    assert (
+        config.redirect_uri == "https://example.com/-/google-credentials/oauth/callback"
+    )
     assert config.google_base_urls.oauth_token == "http://mock/token"
     # Unspecified base URLs keep their defaults
     assert config.google_base_urls.oauth_revoke == (
@@ -112,14 +114,14 @@ def test_empty_encryption_key_is_not_configured(value):
 
 @pytest.mark.asyncio
 async def test_env_resolution(monkeypatch):
-    monkeypatch.setenv("TEST_GOOGLE_AUTH_KEY", FAKE_KEY)
-    monkeypatch.setenv("TEST_GOOGLE_AUTH_OLD_KEY", FAKE_OLD_KEY)
+    monkeypatch.setenv("TEST_GOOGLE_CREDENTIALS_KEY", FAKE_KEY)
+    monkeypatch.setenv("TEST_GOOGLE_CREDENTIALS_OLD_KEY", FAKE_OLD_KEY)
     monkeypatch.setenv("TEST_GOOGLE_CLIENT_SECRET", FAKE_SECRET)
     datasette = await started(
         {
             "encryption-key": [
-                {"$env": "TEST_GOOGLE_AUTH_KEY"},
-                {"$env": "TEST_GOOGLE_AUTH_OLD_KEY"},
+                {"$env": "TEST_GOOGLE_CREDENTIALS_KEY"},
+                {"$env": "TEST_GOOGLE_CREDENTIALS_OLD_KEY"},
             ],
             "client_id": "id",
             "client_secret": {"$env": "TEST_GOOGLE_CLIENT_SECRET"},
@@ -132,8 +134,10 @@ async def test_env_resolution(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_unset_env_var_means_not_configured(monkeypatch):
-    monkeypatch.delenv("TEST_GOOGLE_AUTH_KEY", raising=False)
-    datasette = await started({"encryption-key": {"$env": "TEST_GOOGLE_AUTH_KEY"}})
+    monkeypatch.delenv("TEST_GOOGLE_CREDENTIALS_KEY", raising=False)
+    datasette = await started(
+        {"encryption-key": {"$env": "TEST_GOOGLE_CREDENTIALS_KEY"}}
+    )
     assert not encryption_configured(get_config(datasette))
 
 
@@ -160,7 +164,7 @@ async def test_bad_config_fails_startup(plugin_config, bad_key):
     with pytest.raises(StartupError) as excinfo:
         await datasette.invoke_startup()
     message = str(excinfo.value)
-    assert "datasette-google-auth" in message
+    assert "datasette-google-credentials" in message
     assert f"  {bad_key}:" in message
 
 
@@ -168,13 +172,13 @@ async def test_bad_config_fails_startup(plugin_config, bad_key):
 async def test_startup_error_never_echoes_secrets(monkeypatch):
     # A list with an unset env var yields None inside the list: invalid. The
     # error must name the field without echoing the other (valid) key.
-    monkeypatch.setenv("TEST_GOOGLE_AUTH_KEY", FAKE_KEY)
-    monkeypatch.delenv("TEST_GOOGLE_AUTH_MISSING", raising=False)
+    monkeypatch.setenv("TEST_GOOGLE_CREDENTIALS_KEY", FAKE_KEY)
+    monkeypatch.delenv("TEST_GOOGLE_CREDENTIALS_MISSING", raising=False)
     datasette = make_datasette(
         {
             "encryption-key": [
-                {"$env": "TEST_GOOGLE_AUTH_KEY"},
-                {"$env": "TEST_GOOGLE_AUTH_MISSING"},
+                {"$env": "TEST_GOOGLE_CREDENTIALS_KEY"},
+                {"$env": "TEST_GOOGLE_CREDENTIALS_MISSING"},
             ],
             "client_secret": FAKE_SECRET,
             "unexpected": FAKE_SECRET,
@@ -208,7 +212,7 @@ async def test_startup_error_never_echoes_secrets(monkeypatch):
     ],
 )
 def test_openid_and_email_auto_added(scopes, expected, caplog):
-    with caplog.at_level(logging.INFO, logger="datasette_google_auth.config"):
+    with caplog.at_level(logging.INFO, logger="datasette_google_credentials.config"):
         config = Config.model_validate({"scopes": scopes})
     assert config.scopes == expected
     added = [s for s in ("openid", "email") if s not in scopes]
@@ -240,7 +244,7 @@ async def test_config_page_redacts_secrets(monkeypatch):
         datasette = await started(plugin_config)
         response = await datasette.client.get("/-/config.json")
         assert response.status_code == 200
-        shown = response.json()["plugins"]["datasette-google-auth"]
+        shown = response.json()["plugins"]["datasette-google-credentials"]
         assert shown["encryption-key"] == "***"
         assert shown["client_secret"] == "***"
         assert shown["client_id"] == "visible-client-id"
@@ -268,4 +272,4 @@ async def test_http_client_uses_injected_transport():
 
     # Resetting drops the override (not exercised against the network)
     set_transport(datasette, None)
-    assert datasette._google_auth_transport is None
+    assert datasette._google_credentials_transport is None

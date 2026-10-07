@@ -26,7 +26,7 @@
     footer: Snippet<[{ requestClose: () => void }]>;
   } = $props();
 
-  const titleId = `google-auth-modal-${Math.random().toString(36).slice(2)}`;
+  const titleId = `google-credentials-modal-${Math.random().toString(36).slice(2)}`;
   let wrapper = $state<DatasetteModalElement>();
 
   $effect(() => {

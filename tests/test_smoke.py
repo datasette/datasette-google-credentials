@@ -8,4 +8,4 @@ async def test_plugin_is_installed():
     response = await datasette.client.get("/-/plugins.json")
     assert response.status_code == 200
     installed_plugins = {p["name"] for p in response.json()}
-    assert "datasette-google-auth" in installed_plugins
+    assert "datasette-google-credentials" in installed_plugins

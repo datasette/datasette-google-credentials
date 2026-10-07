@@ -48,7 +48,7 @@ from mock_google.oauth import (
     GoogleUser,
 )
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialBroken,
     CredentialForbidden,
     CredentialNotFound,
@@ -59,38 +59,38 @@ from datasette_google_auth import (
     get_credential,
     list_credentials,
 )
-from datasette_google_auth import service as service_module
-from datasette_google_auth import service_account as service_account_module
-from datasette_google_auth.broker import check_request_url
-from datasette_google_auth.crypto import encrypt_secret
-from datasette_google_auth.http import client as http_client
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.oauth import (
+from datasette_google_credentials import service as service_module
+from datasette_google_credentials import service_account as service_account_module
+from datasette_google_credentials.broker import check_request_url
+from datasette_google_credentials.crypto import encrypt_secret
+from datasette_google_credentials.http import client as http_client
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.oauth import (
     FLOW_COOKIE,
     FLOW_COOKIE_NAMESPACE,
     FlowState,
     safe_return_to,
     sign_state,
 )
-from datasette_google_auth.permissions import (
+from datasette_google_credentials.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     CONNECT,
     DECOY_SA_ID,
     RESOURCE_TYPE,
 )
-from datasette_google_auth.router import router
-from datasette_google_auth.service import add_service_account
-from datasette_google_auth.token_cache import get_token_cache
+from datasette_google_credentials.router import router
+from datasette_google_credentials.service import add_service_account
+from datasette_google_credentials.token_cache import get_token_cache
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-PACKAGE_DIR = ROOT_DIR / "datasette_google_auth"
+PACKAGE_DIR = ROOT_DIR / "datasette_google_credentials"
 
 ALICE = {"id": "alice"}
 BOB = {"id": "bob"}
 ADMIN_ACTOR = {"id": "admin"}
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
-API = "/-/google-auth/api"
+API = "/-/google-credentials/api"
 STUDENTS = f"{SHEETS_BASE}/v4/spreadsheets/students"
 SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 UNKNOWN_ID = "01JZZZZZZZZZZZZZZZZZZZZZZZ"
@@ -195,9 +195,9 @@ class Connect:
         self.mock_google = mock_google
         self.secrets: set[str] = set()
 
-    async def authorize(self, actor=ALICE, return_to="/-/google-auth"):
+    async def authorize(self, actor=ALICE, return_to="/-/google-credentials"):
         response = await self.datasette.client.get(
-            "/-/google-auth/connect?" + urlencode({"return_to": return_to}),
+            "/-/google-credentials/connect?" + urlencode({"return_to": return_to}),
             actor=actor,
         )
         assert response.status_code == 302
@@ -395,8 +395,8 @@ async def run_flows(datasette, mock_google, service_account_keys, monkeypatch):
         (f"{API}/credentials", ALICE),
         (f"{API}/credentials?scopes={SCOPE_SHEETS}", ALICE),
         (f"{API}/status", ALICE),
-        ("/-/google-auth", ALICE),
-        ("/-/google-auth/admin", ADMIN_ACTOR),
+        ("/-/google-credentials", ALICE),
+        ("/-/google-credentials/admin", ADMIN_ACTOR),
         (f"{API}/admin/credentials", ADMIN_ACTOR),
     ):
         response = await keep(await datasette.client.get(path, actor=actor))
@@ -474,7 +474,7 @@ async def test_no_secret_in_responses_page_data_events_or_logs(
         text = response_text(response)
         found = leaks(text, secrets)
         assert not found, (f"response #{number}", found)
-        # No GoogleAuthError escaped an API route (D29): every API answer is
+        # No GoogleCredentialsError escaped an API route (D29): every API answer is
         # the plugin's own JSON, errors in error_response()'s shape, never
         # core's 500 page (which would carry the exception message).
         if isinstance(
@@ -487,10 +487,10 @@ async def test_no_secret_in_responses_page_data_events_or_logs(
 
     kinds = {event.name for event in events}
     assert {
-        "google-auth-credential-created",
-        "google-auth-credential-reconnected",
-        "google-auth-credential-broken",
-        "google-auth-credential-deleted",
+        "google-credential-created",
+        "google-credential-reconnected",
+        "google-credential-broken",
+        "google-credential-deleted",
     } <= kinds
     for event in events:
         text = repr(event) + json.dumps(event.properties(), default=str)
@@ -523,7 +523,7 @@ DEBUG_PATHS = [
     "/__INTERNAL__",
     "/__INTERNAL__.json",
     "/__INTERNAL__.db",
-    "/__INTERNAL__/datasette_google_auth_credentials.json",
+    "/__INTERNAL__/datasette_google_credentials.json",
     "/-/databases.json",
     "/-/config",
     "/-/config.json",
@@ -540,7 +540,7 @@ DEBUG_PATHS = [
     "/-/debug/autocomplete",
     "/-/versions.json",
     "/-/queries.json",
-    "/_memory/-/query.json?sql=select+*+from+datasette_google_auth_credentials",
+    "/_memory/-/query.json?sql=select+*+from+datasette_google_credentials",
 ]
 
 
@@ -575,7 +575,7 @@ async def test_core_debug_views_never_show_secrets(mock_google, service_account_
         assert response.status_code == 404, path
     # /-/config redacts the plugin's secret-bearing keys.
     config = (await datasette.client.get("/-/config.json", actor={"id": "root"})).json()
-    plugin = config["plugins"]["datasette-google-auth"]
+    plugin = config["plugins"]["datasette-google-credentials"]
     assert plugin["encryption-key"] != key
     assert plugin["client_secret"] != OAUTH_CLIENT_SECRET
 
@@ -613,7 +613,7 @@ async def test_secrets_are_never_stored_in_plaintext(
         for path in tmp_path.iterdir()
         if path.name.startswith("internal.db")
     ).decode("latin-1")
-    has_table = "datasette_google_auth_credentials" in stored
+    has_table = "datasette_google_credentials" in stored
     assert has_table
     # Booleans first: a failing `x not in stored` would print both strings.
     # (Not leaks(): the file is full of Fernet ciphertext, by design.)
@@ -628,7 +628,7 @@ def _strings(value, seen, depth=0):
     if depth > 8 or id(value) in seen:
         return
     if isinstance(value, Datasette | httpx2.AsyncBaseTransport):
-        # The Datasette instance is walked through its _google_auth_*
+        # The Datasette instance is walked through its _google_credentials_*
         # attributes only; the transport is the mock Google (which of course
         # holds the tokens it issued).
         return
@@ -655,7 +655,7 @@ def _strings(value, seen, depth=0):
 async def test_decrypted_secrets_are_not_retained(mock_google, service_account_keys):
     """No long-lived object the plugin owns (the Credential, the token
     cache, the touch throttle, the config, anything on ``datasette`` under
-    ``_google_auth_``) holds a decrypted key or refresh token after use."""
+    ``_google_credentials_``) holds a decrypted key or refresh token after use."""
     datasette = await make_datasette(mock_google)
     sa = await add_sa(datasette, service_account_keys)
     oauth_row = await add_oauth(datasette, mock_google)
@@ -668,7 +668,9 @@ async def test_decrypted_secrets_are_not_retained(mock_google, service_account_k
         await cred.request("GET", STUDENTS)
         held.append(cred)
     plugin_state = {
-        name: value for name, value in vars(datasette).items() if "google_auth" in name
+        name: value
+        for name, value in vars(datasette).items()
+        if "google_credentials" in name
     }
     assert plugin_state  # the cache, the config, the throttle, the transport
     reachable = "\n".join(
@@ -684,7 +686,7 @@ async def test_decrypted_secrets_are_not_retained(mock_google, service_account_k
 
 
 def test_config_repr_hides_secrets():
-    from datasette_google_auth.config import Config
+    from datasette_google_credentials.config import Config
 
     config = Config.model_validate(
         {"encryption-key": "KEY-SENTINEL", "client_secret": "SECRET-SENTINEL"}
@@ -842,7 +844,7 @@ def test_every_outbound_client_has_timeouts_and_no_redirects():
                 and node.func.attr in {"AsyncClient", "Client"}
             ):
                 builders.append(path.relative_to(ROOT_DIR).as_posix())
-    assert builders == ["datasette_google_auth/http.py"]
+    assert builders == ["datasette_google_credentials/http.py"]
 
 
 # --- Access -------------------------------------------------------------------
@@ -852,7 +854,7 @@ def test_every_outbound_client_has_timeouts_and_no_redirects():
 async def test_oauth_access_never_calls_allowed(mock_google, monkeypatch):
     """Even with a stray acl grant on an OAuth credential's id, nothing asks
     datasette.allowed()/allowed_many() about it, and only its owner can use
-    it (root and google-auth-admin included)."""
+    it (root and google-credentials-admin included)."""
     datasette = await make_datasette(mock_google)
     datasette.root_enabled = True
     row = await add_oauth(datasette, mock_google)
@@ -895,7 +897,7 @@ async def test_oauth_access_never_calls_allowed(mock_google, monkeypatch):
 
     cred = await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS])
     assert (await cred.request("GET", STUDENTS)).status_code == 200
-    page = await datasette.client.get("/-/google-auth", actor=ALICE)
+    page = await datasette.client.get("/-/google-credentials", actor=ALICE)
     assert page.status_code == 200
 
     assert asked  # global checks (admin, connect) did happen
@@ -1129,7 +1131,7 @@ async def test_every_post_route_rejects_cross_site_requests(
     ],
 )
 def test_return_to_rejects_off_site_targets(value):
-    assert safe_return_to(value) == "/-/google-auth"
+    assert safe_return_to(value) == "/-/google-credentials"
 
 
 @pytest.mark.asyncio
@@ -1144,13 +1146,13 @@ async def test_signed_state_with_off_site_return_to_still_lands_home(mock_google
         {"v": "verifier", "n": "nonce-1"}, namespace=FLOW_COOKIE_NAMESPACE
     )
     response = await datasette.client.get(
-        "/-/google-auth/oauth/callback?"
+        "/-/google-credentials/oauth/callback?"
         + urlencode({"state": state, "error": "access_denied"}),
         actor=ALICE,
         cookies={FLOW_COOKIE: cookie},
     )
     assert response.status_code == 302
-    assert response.headers["location"] == "/-/google-auth"
+    assert response.headers["location"] == "/-/google-credentials"
 
 
 # --- Input handling -------------------------------------------------------------
@@ -1181,7 +1183,7 @@ async def test_labels_and_emails_are_escaped_in_every_page(
     assert callback.status_code == 302
 
     page = await datasette.client.get(
-        "/-/google-auth", actor=ALICE, cookies=dict(callback.cookies)
+        "/-/google-credentials", actor=ALICE, cookies=dict(callback.cookies)
     )
     assert page.status_code == 200
     assert XSS not in page.text
@@ -1193,7 +1195,7 @@ async def test_labels_and_emails_are_escaped_in_every_page(
     labels = {c["label"] for c in _page_data(page.text)["credentials"]}
     assert {XSS, evil_email} <= labels
 
-    admin = await datasette.client.get("/-/google-auth/admin", actor=ADMIN_ACTOR)
+    admin = await datasette.client.get("/-/google-credentials/admin", actor=ADMIN_ACTOR)
     assert admin.status_code == 200
     assert XSS not in admin.text and "<b>bold</b>" not in admin.text
     assert {XSS, evil_email} <= {
@@ -1250,7 +1252,9 @@ async def test_removing_or_changing_the_key_fails_clearly(
     assert status["encryption_configured"] is False
     listing = (await no_key.client.get(f"{API}/credentials", actor=ALICE)).json()
     assert {c["id"] for c in listing["credentials"]} == {sa.id, oauth_row.id}
-    assert (await no_key.client.get("/-/google-auth", actor=ALICE)).status_code == 200
+    assert (
+        await no_key.client.get("/-/google-credentials", actor=ALICE)
+    ).status_code == 200
     for credential_id in (sa.id, oauth_row.id):
         cred = await get_credential(
             no_key, credential_id, actor=ALICE, scopes=[SCOPE_SHEETS]

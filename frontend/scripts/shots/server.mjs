@@ -61,7 +61,7 @@ function freePort() {
 }
 
 const LOAD_PLUGINS = [
-  "datasette-google-auth",
+  "datasette-google-credentials",
   "datasette-acl",
   "datasette-acl-share",
   "datasette-user-profiles", // the share dialog's People search
@@ -70,9 +70,9 @@ const LOAD_PLUGINS = [
 ];
 
 const PERMISSIONS = {
-  "google-auth-connect": true,
-  "google-auth-add-service-account": true,
-  "google-auth-admin": { id: "alice" },
+  "google-credentials-connect": true,
+  "google-credentials-add-service-account": true,
+  "google-credentials-admin": { id: "alice" },
 };
 
 function datasetteConfig(kind) {
@@ -80,7 +80,7 @@ function datasetteConfig(kind) {
     return {
       permissions: PERMISSIONS,
       plugins: {
-        "datasette-google-auth": {
+        "datasette-google-credentials": {
           "encryption-key": throwawayFernetKey(),
           client_id: "demo-client.apps.googleusercontent.com",
           client_secret: "demo-not-a-secret",
@@ -94,7 +94,7 @@ function datasetteConfig(kind) {
     return {
       permissions: PERMISSIONS,
       plugins: {
-        "datasette-google-auth": { redirect_uri: DEMO_REDIRECT_URI },
+        "datasette-google-credentials": { redirect_uri: DEMO_REDIRECT_URI },
       },
     };
   }
@@ -105,7 +105,7 @@ async function reachable(base) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 500);
   try {
-    const resp = await fetch(`${base}/-/google-auth/api/status`, {
+    const resp = await fetch(`${base}/-/google-credentials/api/status`, {
       signal: ctrl.signal,
     });
     return resp.status < 500;
@@ -117,7 +117,9 @@ async function reachable(base) {
 }
 
 export async function startServer(kind) {
-  const dir = mkdtempSync(join(tmpdir(), "datasette-google-auth-shots-"));
+  const dir = mkdtempSync(
+    join(tmpdir(), "datasette-google-credentials-shots-"),
+  );
   const pluginsDir = join(dir, "plugins");
   const configPath = join(dir, "datasette.json");
   const internal = join(dir, "internal.db");

@@ -1,27 +1,27 @@
 /* Shared by the management and admin pages (scoped under the
    page root so nothing leaks into Datasette's own chrome). */
 
-.google-auth-page {
+.google-credentials-page {
   max-width: 56rem;
 }
 
-.google-auth-page section {
+.google-credentials-page section {
   margin: 1.5rem 0 2rem;
 }
 
-.google-auth-page .heading {
+.google-credentials-page .heading {
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
 }
 
-.google-auth-page .heading h2 {
+.google-credentials-page .heading h2 {
   margin: 0;
 }
 
-.google-auth-page .button,
-.google-auth-page .actions button {
+.google-credentials-page .button,
+.google-credentials-page .actions button {
   display: inline-block;
   padding: 0.3rem 0.8rem;
   border: 1px solid #888;
@@ -34,13 +34,13 @@
   cursor: pointer;
 }
 
-.google-auth-page .heading .button {
+.google-credentials-page .heading .button {
   background: #1a73e8;
   border-color: #1a73e8;
   color: #fff;
 }
 
-.google-auth-page .cards {
+.google-credentials-page .cards {
   list-style: none;
   padding: 0;
   margin: 1rem 0;
@@ -48,24 +48,24 @@
   gap: 0.75rem;
 }
 
-.google-auth-page .card {
+.google-credentials-page .card {
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 0.75rem 1rem;
 }
 
-.google-auth-page .title {
+.google-credentials-page .title {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
   flex-wrap: wrap;
 }
 
-.google-auth-page .email {
+.google-credentials-page .email {
   color: #555;
 }
 
-.google-auth-page .badge {
+.google-credentials-page .badge {
   font-size: 0.75rem;
   padding: 0.05rem 0.45rem;
   border-radius: 999px;
@@ -73,22 +73,22 @@
   color: #334;
 }
 
-.google-auth-page .badge-broken {
+.google-credentials-page .badge-broken {
   background: #fde2e1;
   color: #8a1c14;
 }
 
-.google-auth-page .badge-limited {
+.google-credentials-page .badge-limited {
   background: #fff1c2;
   color: #6b4b00;
 }
 
-.google-auth-page .problem {
+.google-credentials-page .problem {
   color: #8a1c14;
   margin: 0.4rem 0;
 }
 
-.google-auth-page dl {
+.google-credentials-page dl {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.15rem 0.75rem;
@@ -96,31 +96,31 @@
   font-size: 0.9rem;
 }
 
-.google-auth-page dt {
+.google-credentials-page dt {
   color: #666;
 }
 
-.google-auth-page dd {
+.google-credentials-page dd {
   margin: 0;
 }
 
-.google-auth-page .actions {
+.google-credentials-page .actions {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
 }
 
-.google-auth-page .empty,
-.google-auth-page .small {
+.google-credentials-page .empty,
+.google-credentials-page .small {
   color: #666;
 }
 
-.google-auth-page .small {
+.google-credentials-page .small {
   font-size: 0.85rem;
 }
 
-.google-auth-page .dismiss {
+.google-credentials-page .dismiss {
   float: right;
   border: none;
   background: none;

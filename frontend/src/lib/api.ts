@@ -2,7 +2,7 @@ import createClient from "openapi-fetch";
 import type { paths } from "../../api.d.ts";
 
 /**
- * Shared typed client for the google-auth JSON API (`just types-routes`
+ * Shared typed client for the google-credentials JSON API (`just types-routes`
  * regenerates `api.d.ts` from the router's OpenAPI document).
  *
  * No CSRF token: Datasette checks `Sec-Fetch-Site`/`Origin` (D30).

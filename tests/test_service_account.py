@@ -8,23 +8,23 @@ from fixtures_google import GOOGLE_BASE_URLS
 from mock_google import MOCK_HOST
 from mock_google.keys import SA_TEST, make_service_account
 
-from datasette_google_auth.crypto import decrypt_credential
-from datasette_google_auth.errors import (
+from datasette_google_credentials.crypto import decrypt_credential
+from datasette_google_credentials.errors import (
     CredentialForbidden,
     CredentialNotFound,
     EncryptionNotConfigured,
-    GoogleAuthError,
+    GoogleCredentialsError,
     GoogleTokenError,
     InvalidServiceAccountKey,
 )
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.permissions import (
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     RESOURCE_TYPE,
     can_manage_sa,
 )
-from datasette_google_auth.service_account import (
+from datasette_google_credentials.service_account import (
     SECRET_FIELDS,
     ServiceAccountKey,
     add_service_account,
@@ -32,8 +32,8 @@ from datasette_google_auth.service_account import (
     parse_key,
     rotate_service_account_key,
 )
-from datasette_google_auth.token_cache import CacheKey, get_token_cache
-from datasette_google_auth.tokens import Token
+from datasette_google_credentials.token_cache import CacheKey, get_token_cache
+from datasette_google_credentials.tokens import Token
 
 ALICE = {"id": "alice"}
 BOB = {"id": "bob"}
@@ -381,7 +381,7 @@ async def test_rotate_permissions(mock_google, service_account_keys):
         await rotate_service_account_key(datasette, None, info.id, key)
     with pytest.raises(CredentialNotFound):
         await rotate_service_account_key(datasette, ALICE, "no-such-id", key)
-    # Can see it (User role, or google-auth-admin) but not edit it.
+    # Can see it (User role, or google-credentials-admin) but not edit it.
     with pytest.raises(CredentialForbidden):
         await rotate_service_account_key(datasette, ADMIN_ACTOR, info.id, key)
     await grant(
@@ -472,7 +472,7 @@ async def test_errors_never_contain_key_material(
     else:
         call = add_service_account(datasette, ALICE, _bad_inputs(sa)[case], "SA")
 
-    with pytest.raises(GoogleAuthError) as info:
+    with pytest.raises(GoogleCredentialsError) as info:
         await call
     error = info.value
     text = " ".join(

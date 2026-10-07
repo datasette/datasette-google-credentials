@@ -1,5 +1,5 @@
 [project]
-name = "datasette-google-auth"
+name = "datasette-google-credentials"
 version = "0.0.1a0"
 description = "Google credentials for Datasette: shared service accounts and per-user OAuth connections, brokered to other plugins"
 readme = "README.md"
@@ -45,13 +45,13 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.urls]
-Homepage = "https://github.com/datasette/datasette-google-auth"
-Changelog = "https://github.com/datasette/datasette-google-auth/releases"
-Issues = "https://github.com/datasette/datasette-google-auth/issues"
-CI = "https://github.com/datasette/datasette-google-auth/actions"
+Homepage = "https://github.com/datasette/datasette-google-credentials"
+Changelog = "https://github.com/datasette/datasette-google-credentials/releases"
+Issues = "https://github.com/datasette/datasette-google-credentials/issues"
+CI = "https://github.com/datasette/datasette-google-credentials/actions"
 
 [project.entry-points.datasette]
-google_auth = "datasette_google_auth"
+google_credentials = "datasette_google_credentials"
 
 # Editable, path-based sibling checkouts. ../datasette-acl must be on a branch
 # that has the datasette_acl.grants Principal API
@@ -75,12 +75,12 @@ markers = [
 ]
 
 [tool.setuptools.package-data]
-datasette_google_auth = ["static/**/*", "templates/*", "manifest.json"]
+datasette_google_credentials = ["static/**/*", "templates/*", "manifest.json"]
 
 [tool.setuptools.packages.find]
 # Whitelist the package we ship (see datasette-cron: an exclude-based list
 # lets setuptools recurse into build/lib/ from earlier builds).
-include = ["datasette_google_auth*"]
+include = ["datasette_google_credentials*"]
 
 [tool.ty.src]
 exclude = ["tests/", "samples/", "frontend/"]

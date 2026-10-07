@@ -1,4 +1,4 @@
-"""The plugin's own configuration: the ``plugins: datasette-google-auth:`` block.
+"""The plugin's own configuration: the ``plugins: datasette-google-credentials:`` block.
 
 Validated once at startup. A typo'd key or a bad value fails startup with a
 ``StartupError`` naming the field, rather than being silently ignored.
@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 if TYPE_CHECKING:
     from datasette.app import Datasette
 
-PLUGIN_NAME = "datasette-google-auth"
+PLUGIN_NAME = "datasette-google-credentials"
 
 # Always requested: `openid` gives the stable `sub`, `email` labels the
 # credential with its Google account (D4, D9).
@@ -46,7 +46,7 @@ class Config(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         hide_input_in_errors=True,
-        title="datasette-google-auth plugin config",
+        title="datasette-google-credentials plugin config",
         use_attribute_docstrings=True,
     )
 
@@ -54,7 +54,7 @@ class Config(BaseModel):
         None, alias="encryption-key", repr=False
     )
     """Fernet key used to encrypt stored secrets, usually
-    ``{"$env": "DATASETTE_GOOGLE_AUTH_KEY"}``. A list enables rotation: the
+    ``{"$env": "DATASETTE_GOOGLE_CREDENTIALS_KEY"}``. A list enables rotation: the
     first key encrypts, all keys decrypt. Unset means credentials cannot be
     created."""
 
@@ -76,7 +76,7 @@ class Config(BaseModel):
 
     redirect_uri: str | None = None
     """Override the OAuth redirect URI (for proxies). Defaults to the absolute
-    URL of ``/-/google-auth/oauth/callback``."""
+    URL of ``/-/google-credentials/oauth/callback``."""
 
     google_base_urls: GoogleBaseUrls = Field(default_factory=GoogleBaseUrls)
     """Test-only overrides for Google endpoints."""
@@ -135,8 +135,8 @@ def load_config(datasette: Datasette) -> Config:
 
 def get_config(datasette: Datasette) -> Config:
     """The config validated at startup (validates now if startup hasn't run)."""
-    config = getattr(datasette, "_google_auth_config", None)
+    config = getattr(datasette, "_google_credentials_config", None)
     if config is None:
         config = load_config(datasette)
-        setattr(datasette, "_google_auth_config", config)  # noqa: B010
+        setattr(datasette, "_google_credentials_config", config)  # noqa: B010
     return config

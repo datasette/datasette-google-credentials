@@ -1,5 +1,5 @@
 """
-The single source of truth for every span and metric datasette-google-auth
+The single source of truth for every span and metric datasette-google-credentials
 emits (D29).
 
 Three things read this module:
@@ -16,7 +16,7 @@ Three things read this module:
    everything registered is emitted.
 
 Naming: the instrumentation scope is the import package name
-(`datasette_google_auth`), and so is the prefix of every plugin-specific
+(`datasette_google_credentials`), and so is the prefix of every plugin-specific
 signal. `error.type`, `http.*` and `server.address` reuse the semantic
 convention keys, as our own `Attribute` instances (core's carry core's prose).
 
@@ -46,50 +46,50 @@ __all__ = [
 # --- Attributes -----------------------------------------------------------
 
 CREDENTIAL_TYPE = Attribute(
-    "datasette_google_auth.credential.type",
+    "datasette_google_credentials.credential.type",
     "`service_account` or `google_oauth`.",
     values={"service_account", "google_oauth"},
 )
 CREDENTIAL_ID = Attribute(
-    "datasette_google_auth.credential.id",
+    "datasette_google_credentials.credential.id",
     "The credential's ULID. Opaque, and **spans only, never a metric "
     "dimension**. Owner, actor and email are never recorded.",
 )
 # The callback span only knows the id once the credential is saved.
 CALLBACK_CREDENTIAL_ID = Attribute(
-    "datasette_google_auth.credential.id",
+    "datasette_google_credentials.credential.id",
     "The ULID of the credential created or reconnected. Set on success only.",
     optional=True,
 )
 CACHE = Attribute(
-    "datasette_google_auth.cache",
+    "datasette_google_credentials.cache",
     "`hit` if the token came from the in-memory token cache, `miss` if it "
     "was minted or refreshed.",
     values={"hit", "miss"},
 )
 TOKEN_CACHE = Attribute(
-    "datasette_google_auth.cache",
+    "datasette_google_credentials.cache",
     "`hit` or `miss`. Set once the token is in hand; absent when access "
     "was denied or the fetch failed.",
     optional=True,
     values={"hit", "miss"},
 )
 TOKEN_CREDENTIAL_TYPE = Attribute(
-    "datasette_google_auth.credential.type",
+    "datasette_google_credentials.credential.type",
     "`service_account` or `google_oauth`. Set once the credential has been "
     "re-read; absent when it doesn't exist or the actor can't see it.",
     optional=True,
     values={"service_account", "google_oauth"},
 )
 GOOGLE_OPERATION = Attribute(
-    "datasette_google_auth.google.operation",
+    "datasette_google_credentials.google.operation",
     "Which Google call: `mint` (service-account JWT exchange), `refresh`, "
     "`exchange` (authorization code), `userinfo` or `revoke`. On the "
     "metric only: span names already carry it.",
     values={"mint", "refresh", "exchange", "userinfo", "revoke"},
 )
 OUTCOME = Attribute(
-    "datasette_google_auth.outcome",
+    "datasette_google_credentials.outcome",
     "How the Google call ended: `ok`; `invalid_grant` (key deleted or "
     "disabled, grant revoked, code reused); `http_error` (any other non-200); "
     "`network_error` (Google never answered); `invalid_response` (a 200 "
@@ -123,7 +123,7 @@ GOOGLE_ERROR_VALUES = frozenset(
     }
 )
 GOOGLE_ERROR = Attribute(
-    "datasette_google_auth.google.error",
+    "datasette_google_credentials.google.error",
     "Google's OAuth `error` code, from a failed reply or the callback's "
     "`error` parameter. Clamped to the RFC 6749 / RFC 7009 codes plus "
     "Google's documented ones; anything else is `_OTHER`. Never the "
@@ -132,7 +132,7 @@ GOOGLE_ERROR = Attribute(
     values=GOOGLE_ERROR_VALUES,
 )
 CALLBACK_RESULT = Attribute(
-    "datasette_google_auth.callback.result",
+    "datasette_google_credentials.callback.result",
     "How the Connect Google callback ended: `created` / `reconnected` "
     "(success); `cancelled` (the user clicked Cancel); `google_error` (Google "
     "sent another `error`); `invalid_state` (bad, expired or foreign state or "
@@ -154,22 +154,22 @@ CALLBACK_RESULT = Attribute(
     },
 )
 SCOPES_COUNT = Attribute(
-    "datasette_google_auth.scopes.count",
+    "datasette_google_credentials.scopes.count",
     "How many scopes the service-account token was minted for.",
 )
 SCOPES_MISSING = Attribute(
-    "datasette_google_auth.scopes.missing",
+    "datasette_google_credentials.scopes.missing",
     "How many configured API scopes the user didn't grant (partial consent). "
     "Set on success only; `0` when everything was granted.",
     optional=True,
 )
 REFRESH_TOKEN_ROTATED = Attribute(
-    "datasette_google_auth.refresh_token.rotated",
+    "datasette_google_credentials.refresh_token.rotated",
     "`True` if Google returned a new refresh token. Set on success only.",
     optional=True,
 )
 RETRIED = Attribute(
-    "datasette_google_auth.retried",
+    "datasette_google_credentials.retried",
     "`True` if the first response was a 401, so the cached token was evicted "
     "and the request retried once with a fresh one.",
 )
@@ -206,7 +206,7 @@ _GOOGLE_STATUS = (
 )
 
 TOKEN = SpanName(
-    "datasette_google_auth.token",
+    "datasette_google_credentials.token",
     "`Credential.token()`: re-reading the credential, re-checking access, "
     "then serving from the token cache or minting/refreshing. On a cache "
     "miss the `token.mint` or `token.refresh` span is its child. Status is "
@@ -216,7 +216,7 @@ TOKEN = SpanName(
     (CREDENTIAL_ID, TOKEN_CREDENTIAL_TYPE, TOKEN_CACHE, ERROR_TYPE),
 )
 REQUEST = SpanName(
-    "datasette_google_auth.request",
+    "datasette_google_credentials.request",
     "`Credential.request()`: one authenticated call to a Google API, with "
     "its `token` span(s) as children (two on a 401 retry). A returned 4xx "
     "or 5xx is the consumer's to handle and leaves the status unset; status "
@@ -233,14 +233,14 @@ REQUEST = SpanName(
     ),
 )
 TOKEN_MINT = SpanName(
-    "datasette_google_auth.token.mint",
+    "datasette_google_credentials.token.mint",
     "A service-account JWT-bearer exchange at Google's token endpoint, for "
     "the broker or the live test when a key is added or rotated." + _GOOGLE_STATUS,
     (SCOPES_COUNT, OUTCOME, HTTP_RESPONSE_STATUS_CODE, GOOGLE_ERROR, ERROR_TYPE),
     kind=SpanKind.CLIENT,
 )
 TOKEN_REFRESH = SpanName(
-    "datasette_google_auth.token.refresh",
+    "datasette_google_credentials.token.refresh",
     "An OAuth refresh-token grant at Google's token endpoint." + _GOOGLE_STATUS,
     (
         OUTCOME,
@@ -252,29 +252,29 @@ TOKEN_REFRESH = SpanName(
     kind=SpanKind.CLIENT,
 )
 OAUTH_EXCHANGE = SpanName(
-    "datasette_google_auth.oauth.exchange",
+    "datasette_google_credentials.oauth.exchange",
     "The authorization-code (+ PKCE verifier) exchange during the Connect "
     "Google callback." + _GOOGLE_STATUS,
     (OUTCOME, HTTP_RESPONSE_STATUS_CODE, GOOGLE_ERROR, ERROR_TYPE),
     kind=SpanKind.CLIENT,
 )
 OAUTH_USERINFO = SpanName(
-    "datasette_google_auth.oauth.userinfo",
+    "datasette_google_credentials.oauth.userinfo",
     "The OpenID userinfo call that identifies the Google account during the "
     "Connect Google callback." + _GOOGLE_STATUS,
     (OUTCOME, HTTP_RESPONSE_STATUS_CODE, GOOGLE_ERROR, ERROR_TYPE),
     kind=SpanKind.CLIENT,
 )
 OAUTH_REVOKE = SpanName(
-    "datasette_google_auth.oauth.revoke",
+    "datasette_google_credentials.oauth.revoke",
     "Best-effort revocation of a refresh token when an OAuth credential is "
     "deleted. The delete goes ahead either way." + _GOOGLE_STATUS,
     (OUTCOME, HTTP_RESPONSE_STATUS_CODE, GOOGLE_ERROR, ERROR_TYPE),
     kind=SpanKind.CLIENT,
 )
 OAUTH_CALLBACK = SpanName(
-    "datasette_google_auth.oauth.callback",
-    "The Connect Google callback (`GET /-/google-auth/oauth/callback`) once "
+    "datasette_google_credentials.oauth.callback",
+    "The Connect Google callback (`GET /-/google-credentials/oauth/callback`) once "
     "the actor is allowed to connect, child of core's request span, with "
     "the `oauth.exchange` and `oauth.userinfo` spans as children. Status is "
     "`ERROR` for `google_error`, `no_refresh_token`, `invalid_grant`, "
@@ -306,7 +306,7 @@ SPANS: tuple[SpanName, ...] = (
 GOOGLE_DURATION_BUCKETS = (0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10)
 
 M_GOOGLE_DURATION = MetricName(
-    "datasette_google_auth.google.duration",
+    "datasette_google_credentials.google.duration",
     HISTOGRAM,
     "s",
     "Duration of one call to a Google OAuth endpoint, by operation and "
@@ -317,7 +317,7 @@ M_GOOGLE_DURATION = MetricName(
     buckets=GOOGLE_DURATION_BUCKETS,
 )
 M_TOKEN_CACHE_LOOKUPS = MetricName(
-    "datasette_google_auth.token_cache.lookups",
+    "datasette_google_credentials.token_cache.lookups",
     COUNTER,
     "{lookup}",
     "Token-cache lookups by credential type and `hit` / `miss`. Hit ratio "
@@ -325,7 +325,7 @@ M_TOKEN_CACHE_LOOKUPS = MetricName(
     (CREDENTIAL_TYPE, CACHE),
 )
 M_REQUEST_DURATION = MetricName(
-    "datasette_google_auth.request.duration",
+    "datasette_google_credentials.request.duration",
     HISTOGRAM,
     "s",
     "Duration of `Credential.request()`, token fetches and a 401 retry included.",
@@ -339,7 +339,7 @@ M_REQUEST_DURATION = MetricName(
     buckets=GOOGLE_DURATION_BUCKETS,
 )
 M_CREDENTIALS_BROKEN = MetricName(
-    "datasette_google_auth.credentials.broken",
+    "datasette_google_credentials.credentials.broken",
     COUNTER,
     "{credential}",
     "Credentials marked broken because Google refused them (`invalid_grant`). "
@@ -348,7 +348,7 @@ M_CREDENTIALS_BROKEN = MetricName(
     (CREDENTIAL_TYPE,),
 )
 M_OAUTH_CALLBACKS = MetricName(
-    "datasette_google_auth.oauth.callbacks",
+    "datasette_google_credentials.oauth.callbacks",
     COUNTER,
     "{callback}",
     "Connect Google callbacks by result.",

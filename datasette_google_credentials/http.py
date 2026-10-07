@@ -15,7 +15,7 @@ import httpx2
 if TYPE_CHECKING:
     from datasette.app import Datasette
 
-_TRANSPORT_ATTR = "_google_auth_transport"
+_TRANSPORT_ATTR = "_google_credentials_transport"
 
 TIMEOUT = httpx2.Timeout(10.0)
 

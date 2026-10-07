@@ -22,10 +22,10 @@ from mock_google.oauth import (
     SCOPE_SHEETS_RO,
 )
 
-from datasette_google_auth.crypto import encrypt_secret
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.permissions import ADD_SERVICE_ACCOUNT, RESOURCE_TYPE
-from datasette_google_auth.service_account import add_service_account
+from datasette_google_credentials.crypto import encrypt_secret
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.permissions import ADD_SERVICE_ACCOUNT, RESOURCE_TYPE
+from datasette_google_credentials.service_account import add_service_account
 
 SAMPLES = Path(__file__).parent.parent / "samples"
 SAMPLE = SAMPLES / "google_sheets_import.py"
@@ -133,21 +133,21 @@ def sheets_calls(mock_google):
 def test_sample_uses_only_the_public_api():
     import ast
 
-    import datasette_google_auth
+    import datasette_google_credentials
 
     tree = ast.parse(SAMPLE.read_text())
     imported = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
-            if node.module.startswith("datasette_google_auth"):
-                assert node.module == "datasette_google_auth", node.module
+            if node.module.startswith("datasette_google_credentials"):
+                assert node.module == "datasette_google_credentials", node.module
                 imported |= {alias.name for alias in node.names}
         elif isinstance(node, ast.Import):
             assert not any(
-                a.name.startswith("datasette_google_auth") for a in node.names
+                a.name.startswith("datasette_google_credentials") for a in node.names
             )
     assert imported
-    assert imported <= set(datasette_google_auth.__all__)
+    assert imported <= set(datasette_google_credentials.__all__)
 
 
 @pytest.mark.parametrize(
@@ -237,7 +237,10 @@ async def test_form_lists_credentials(mock_google, service_account_keys, importe
     assert f'value="{oauth.id}"' in page
     assert f'value="{sa.id}"' in page
     assert SA_TEST in page
-    assert "/-/google-auth/connect?return_to=%2F-%2Fgoogle-sheets-import%2Fdata" in page
+    assert (
+        "/-/google-credentials/connect?return_to=%2F-%2Fgoogle-sheets-import%2Fdata"
+        in page
+    )
 
 
 @pytest.mark.asyncio
@@ -571,7 +574,7 @@ async def test_missing_scopes_shows_reconnect_link(mock_google, importer):
     assert response.status_code == 403
     assert "missing required scopes" in response.text
     assert (
-        '<a href="/-/google-auth/connect?return_to=%2F-%2Fgoogle-sheets-import%2Fdata">'
+        '<a href="/-/google-credentials/connect?return_to=%2F-%2Fgoogle-sheets-import%2Fdata">'
         "Reconnect Google</a>"
     ) in response.text
     assert sheets_calls(mock_google) == []

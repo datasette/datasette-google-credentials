@@ -66,7 +66,7 @@ class ListedCredential(CredentialInfo):
 
 
 class AdminCredentialInfo(CredentialInfo):
-    """One credential as a ``google-auth-admin`` sees it in the "All
+    """One credential as a ``google-credentials-admin`` sees it in the "All
     credentials" view (ticket 15): ``CredentialInfo`` plus who owns it and
     who used it last. Information only: it never grants use (D6)."""
 

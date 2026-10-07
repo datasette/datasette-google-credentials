@@ -10,7 +10,7 @@
   import { loadPageData } from "../../page_data/load.ts";
 
   /**
-   * Every credential, for `google-auth-admin` holders (D6): list and delete,
+   * Every credential, for `google-credentials-admin` holders (D6): list and delete,
    * for offboarding and incidents. Deliberately no use, rename or reconnect:
    * an admin can never act as someone else's Google account.
    *
@@ -82,7 +82,7 @@
 
   async function refresh() {
     const result = await api(
-      client.GET("/-/google-auth/api/admin/credentials"),
+      client.GET("/-/google-credentials/api/admin/credentials"),
     );
     if (result.data) {
       credentials = result.data.credentials;
@@ -104,7 +104,7 @@
   {/if}
 {/snippet}
 
-<div class="google-auth-page admin-page">
+<div class="google-credentials-page admin-page">
   <h1>All Google credentials</h1>
 
   <p>

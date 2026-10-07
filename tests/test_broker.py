@@ -14,8 +14,8 @@ from mock_google.oauth import (
     GoogleUser,
 )
 
-import datasette_google_auth
-from datasette_google_auth import (
+import datasette_google_credentials
+from datasette_google_credentials import (
     Credential,
     CredentialBroken,
     CredentialChanged,
@@ -24,7 +24,7 @@ from datasette_google_auth import (
     CredentialNotFound,
     CredentialUndecryptable,
     EncryptionNotConfigured,
-    GoogleAuthError,
+    GoogleCredentialsError,
     GoogleTokenError,
     InvalidServiceAccountKey,
     MissingScopes,
@@ -32,22 +32,22 @@ from datasette_google_auth import (
     get_credential,
     list_credentials,
 )
-from datasette_google_auth.broker import (
+from datasette_google_credentials.broker import (
     SA_BROKEN_DETAIL,
     TouchThrottle,
     missing_scopes,
 )
-from datasette_google_auth.crypto import decrypt_credential, encrypt_secret
-from datasette_google_auth.internal_db import TABLE, InternalDB
-from datasette_google_auth.permissions import (
+from datasette_google_credentials.crypto import decrypt_credential, encrypt_secret
+from datasette_google_credentials.internal_db import TABLE, InternalDB
+from datasette_google_credentials.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     DECOY_SA_ID,
     RESOURCE_TYPE,
     seed_manager,
 )
-from datasette_google_auth.service_account import add_service_account, parse_key
-from datasette_google_auth.token_cache import get_token_cache
+from datasette_google_credentials.service_account import add_service_account, parse_key
+from datasette_google_credentials.token_cache import get_token_cache
 
 ALICE = {"id": "alice"}
 BOB = {"id": "bob"}
@@ -140,21 +140,21 @@ def sheets_calls(mock_google):
 
 
 def test_public_api_is_exported():
-    for name in datasette_google_auth.__all__:
-        assert hasattr(datasette_google_auth, name), name
+    for name in datasette_google_credentials.__all__:
+        assert hasattr(datasette_google_credentials, name), name
     assert {
         "list_credentials",
         "get_credential",
         "Credential",
         "CredentialInfo",
-        "GoogleAuthError",
+        "GoogleCredentialsError",
         "CredentialNotFound",
         "CredentialForbidden",
         "CredentialBroken",
         "MissingScopes",
         "EncryptionNotConfigured",
         "error_response",
-    } <= set(datasette_google_auth.__all__)
+    } <= set(datasette_google_credentials.__all__)
 
 
 @pytest.mark.asyncio
@@ -230,7 +230,7 @@ async def test_root_cannot_use_oauth_credential(mock_google):
     # An actor called "root" without --root is just another user.
     with pytest.raises(CredentialNotFound):
         await get_credential(datasette, row.id, actor=ROOT, scopes=[])
-    # With --root, but google-auth-admin granted only to "admin" in config:
+    # With --root, but google-credentials-admin granted only to "admin" in config:
     # root isn't an admin here, so it can't even tell the credential exists.
     datasette.root_enabled = True
     with pytest.raises(CredentialNotFound):
@@ -240,7 +240,7 @@ async def test_root_cannot_use_oauth_credential(mock_google):
 
 @pytest.mark.asyncio
 async def test_root_as_implicit_admin_gets_forbidden(mock_google):
-    # With no google-auth-admin block, --root holds every action, admin
+    # With no google-credentials-admin block, --root holds every action, admin
     # included: it can see the credential (admin view) but never use it.
     datasette = mock_google.datasette(
         plugin_config={"encryption-key": Fernet.generate_key().decode()}
@@ -291,7 +291,7 @@ async def test_acl_grant_on_oauth_id_is_ignored(mock_google, monkeypatch):
     assert await list_credentials(datasette, actor=BOB) == []
     cred = await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS])
     await cred.token()
-    # allowed() was only ever asked global questions (google-auth-admin) or
+    # allowed() was only ever asked global questions (google-credentials-admin) or
     # about the decoy service account (ticket 24), never about the OAuth
     # credential.
     assert calls
@@ -418,7 +418,7 @@ async def test_service_account_rotated_during_mint_is_not_marked_broken(
     row = await add_unregistered_sa(datasette, service_account_keys)
     cred = await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS])
 
-    from datasette_google_auth import broker
+    from datasette_google_credentials import broker
 
     real_mint = broker.mint_service_account_token
 
@@ -466,7 +466,7 @@ async def test_missing_scopes_has_reconnect_url(mock_google):
         await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS])
     assert excinfo.value.missing == [SCOPE_SHEETS]
     # The configured scopes include it, so a plain reconnect asks again.
-    assert excinfo.value.reconnect_url == "/-/google-auth/connect"
+    assert excinfo.value.reconnect_url == "/-/google-credentials/connect"
     assert excinfo.value.not_configured == []
     # D27: spreadsheets implies spreadsheets.readonly (not the reverse).
     full = await add_oauth(datasette, mock_google, user=SECOND_USER)
@@ -486,7 +486,7 @@ async def test_implied_scope_counts_as_configured(mock_google):
         await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS_RO])
     assert excinfo.value.missing == [SCOPE_SHEETS_RO]
     assert excinfo.value.not_configured == []
-    assert excinfo.value.reconnect_url == "/-/google-auth/connect"
+    assert excinfo.value.reconnect_url == "/-/google-credentials/connect"
 
 
 @pytest.mark.asyncio
@@ -522,7 +522,7 @@ async def test_broken_credential_raises(mock_google):
         await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS])
     assert excinfo.value.credential_id == row.id
     assert excinfo.value.detail == "Google access was revoked"
-    assert excinfo.value.reconnect_url == "/-/google-auth/connect"
+    assert excinfo.value.reconnect_url == "/-/google-credentials/connect"
     # Not-found still wins for anyone else.
     with pytest.raises(CredentialNotFound):
         await get_credential(datasette, row.id, actor=BOB, scopes=[SCOPE_SHEETS])
@@ -538,7 +538,7 @@ async def test_revoked_oauth_grant_marks_broken_through_broker(mock_google):
     cred = await get_credential(datasette, row.id, actor=ALICE, scopes=[SCOPE_SHEETS])
     with pytest.raises(CredentialBroken) as excinfo:
         await cred.request("GET", STUDENTS)
-    assert excinfo.value.reconnect_url == "/-/google-auth/connect"
+    assert excinfo.value.reconnect_url == "/-/google-credentials/connect"
     assert refresh_token not in str(excinfo.value)
     assert (await idb(datasette).get(row.id)).status == "broken"  # type: ignore[union-attr]
 
@@ -624,7 +624,7 @@ async def test_list_credentials(mock_google, service_account_keys):
             datasette, actor=ALICE, scopes=[SCOPE_SHEETS_RO, SCOPE_SHEETS]
         )
     ) == [full.id, sa.id, other_sa.id]
-    # google-auth-admin doesn't widen the list; anonymous gets nothing.
+    # google-credentials-admin doesn't widen the list; anonymous gets nothing.
     assert await list_credentials(datasette, actor=ADMIN_ACTOR) == []
     assert await list_credentials(datasette, actor=None) == []
     assert await list_credentials(datasette, actor={}) == []
@@ -650,7 +650,7 @@ async def test_touch_used_is_throttled(mock_google, monkeypatch):
     datasette = await make_datasette(mock_google)
     row = await add_oauth(datasette, mock_google)
     now = [1000.0]
-    datasette._google_auth_touch_throttle = TouchThrottle(clock=lambda: now[0])
+    datasette._google_credentials_touch_throttle = TouchThrottle(clock=lambda: now[0])
 
     writes = []
     real_touch = InternalDB.touch_used
@@ -734,7 +734,7 @@ def test_missing_scopes(requested, granted, missing):
         (CredentialChanged("c1"), 409, {}),
         (GoogleTokenError(500, "backend_error"), 502, {}),
         (InvalidServiceAccountKey("Invalid service account key: bad"), 400, {}),
-        (GoogleAuthError("something"), 500, {}),
+        (GoogleCredentialsError("something"), 500, {}),
     ],
 )
 def test_error_response(exc, status, extra):
@@ -753,12 +753,12 @@ def test_error_response(exc, status, extra):
 
 
 def test_error_response_covers_every_error_class():
-    import datasette_google_auth.errors as errors
+    import datasette_google_credentials.errors as errors
 
     classes = [
         obj
         for obj in vars(errors).values()
-        if isinstance(obj, type) and issubclass(obj, GoogleAuthError)
+        if isinstance(obj, type) and issubclass(obj, GoogleCredentialsError)
     ]
     assert len(classes) >= 10
     for cls in classes:

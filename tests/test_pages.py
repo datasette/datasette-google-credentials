@@ -1,4 +1,4 @@
-"""The ``/-/google-auth`` management page (ticket 14), server side.
+"""The ``/-/google-credentials`` management page (ticket 14), server side.
 
 Page data, setup-notice flags, the menu link, the share dialog's assets and
 the list endpoint's page fields. The Svelte app itself is checked by hand
@@ -19,29 +19,29 @@ from mock_google.oauth import (
     SCOPE_SHEETS,
 )
 
-from datasette_google_auth import sharing
-from datasette_google_auth.crypto import encrypt_secret
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.page_data import IndexPageData
-from datasette_google_auth.permissions import (
+from datasette_google_credentials import sharing
+from datasette_google_credentials.crypto import encrypt_secret
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.page_data import IndexPageData
+from datasette_google_credentials.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     CONNECT,
     RESOURCE_TYPE,
 )
-from datasette_google_auth.service import add_service_account
+from datasette_google_credentials.service import add_service_account
 
 DEV_PORT = 5187
 SHARE_DEV_PORT = 5199
 SHARE_JS = f"http://localhost:{SHARE_DEV_PORT}/src/main.ts"
-PAGE = "/-/google-auth"
+PAGE = "/-/google-credentials"
 MENU_LINK = f'<a href="{PAGE}">Google accounts</a>'
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
 
 ALICE = {"id": "alice"}  # connect + add service account
 BOB = {"id": "bob"}  # connect only
 CAROL = {"id": "carol"}  # add service account only
-DAVE = {"id": "dave"}  # no google-auth action at all
+DAVE = {"id": "dave"}  # no google-credentials action at all
 ADMIN_ACTOR = {"id": "admin"}
 
 
@@ -60,7 +60,7 @@ async def make_datasette(mock_google, *, plugin_config=None, permissions=None, *
             "plugins": {
                 "datasette-vite": {
                     "dev_ports": {
-                        "datasette_google_auth": DEV_PORT,
+                        "datasette_google_credentials": DEV_PORT,
                         "datasette_acl_share": SHARE_DEV_PORT,
                     }
                 }
@@ -143,7 +143,7 @@ async def test_anonymous_gets_403_even_when_actions_are_open_to_all(mock_google)
 async def test_signed_in_without_actions_sees_shared_service_accounts(
     mock_google, service_account_keys
 ):
-    # No google-auth action, but a service account shared with them: the
+    # No google-credentials action, but a service account shared with them: the
     # page is where they find its email to share sheets with.
     datasette = await make_datasette(mock_google)
     data = await load_page(datasette, DAVE)
@@ -178,7 +178,10 @@ async def test_page_data_lists_own_oauth_and_usable_service_accounts(
         (info.id, "service_account"),
     ]
     assert data.actor_id == "alice"
-    assert data.connect_url == "/-/google-auth/connect?return_to=%2F-%2Fgoogle-auth"
+    assert (
+        data.connect_url
+        == "/-/google-credentials/connect?return_to=%2F-%2Fgoogle-credentials"
+    )
 
     # The admin sees no one else's credentials here (that's ticket 15's view).
     assert (await load_page(datasette, ADMIN_ACTOR)).credentials == []
@@ -242,21 +245,24 @@ async def test_setup_notice_flags(mock_google, plugin_config, encryption, oauth)
         assert status.encryption_configured is encryption
         assert status.oauth_configured is oauth
         # The exact URI admins paste into Google Cloud console.
-        assert status.redirect_uri == "http://localhost/-/google-auth/oauth/callback"
+        assert (
+            status.redirect_uri
+            == "http://localhost/-/google-credentials/oauth/callback"
+        )
         # Full setup steps are for those who can fix it.
         assert status.is_admin is (actor is ADMIN_ACTOR)
 
 
 @pytest.mark.asyncio
 async def test_redirect_uri_override_is_shown(mock_google):
-    uri = "https://datasette.example.com/-/google-auth/oauth/callback"
+    uri = "https://datasette.example.com/-/google-credentials/oauth/callback"
     datasette = await make_datasette(mock_google, plugin_config={"redirect_uri": uri})
     assert (await load_page(datasette, ADMIN_ACTOR)).status.redirect_uri == uri
 
 
 @pytest.mark.asyncio
 async def test_root_counts_as_admin_for_setup_steps(mock_google):
-    # `--root` holds every action unless config restricts google-auth-admin
+    # `--root` holds every action unless config restricts google-credentials-admin
     # to others (D25); then root sees the "ask an admin" notices.
     datasette = await make_datasette(mock_google, permissions={CONNECT: {"id": "x"}})
     datasette.root_enabled = True
@@ -321,7 +327,7 @@ async def test_share_assets_only_on_the_management_page(mock_google):
     assert data.share is not None
     assert data.share.features == sharing.share_features()
 
-    for path in ("/", "/-/versions", "/-/google-auth/oauth/callback"):
+    for path in ("/", "/-/versions", "/-/google-credentials/oauth/callback"):
         assert SHARE_JS not in (await get(datasette, path, ALICE)).text, path
 
 
@@ -368,14 +374,16 @@ async def test_list_reports_role_and_allowed_changes(
     info, _ = await add_sa(datasette, service_account_keys)
     await share(datasette, info.id, role)
 
-    listed = (await get(datasette, "/-/google-auth/api/credentials", BOB)).json()[
-        "credentials"
-    ]
+    listed = (
+        await get(datasette, "/-/google-credentials/api/credentials", BOB)
+    ).json()["credentials"]
     assert [(c["role"], c["can_edit"], c["can_manage"]) for c in listed] == [
         (role, can_edit, can_manage)
     ]
     # The creator is Manager.
-    alice = (await get(datasette, "/-/google-auth/api/credentials", ALICE)).json()
+    alice = (
+        await get(datasette, "/-/google-credentials/api/credentials", ALICE)
+    ).json()
     assert alice["credentials"][0]["role"] == "Manager"
 
 
@@ -390,9 +398,9 @@ async def test_list_reports_last_used_and_missing_scopes(mock_google):
 
     listed = {
         c["id"]: c
-        for c in (await get(datasette, "/-/google-auth/api/credentials", ALICE)).json()[
-            "credentials"
-        ]
+        for c in (
+            await get(datasette, "/-/google-credentials/api/credentials", ALICE)
+        ).json()["credentials"]
     }
     assert listed[full.id]["missing_scopes"] == []
     assert listed[full.id]["last_used_at"]

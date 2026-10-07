@@ -25,10 +25,10 @@ from mock_google.oauth import (
     SCOPE_SHEETS_RO,
 )
 
-from datasette_google_auth.crypto import encrypt_secret
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.permissions import ADD_SERVICE_ACCOUNT
-from datasette_google_auth.service_account import add_service_account
+from datasette_google_credentials.crypto import encrypt_secret
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.permissions import ADD_SERVICE_ACCOUNT
+from datasette_google_credentials.service_account import add_service_account
 
 README = Path(__file__).parent.parent / "README.md"
 MARKER = "<!-- readme-consumer-example -->"
@@ -109,7 +109,8 @@ async def test_lists_credentials(mock_google, service_account_keys, preview):
     assert [c["id"] for c in data["credentials"]] == [oauth.id, sa.id]
     assert data["credentials"][1]["google_email"] == SA_TEST
     assert (
-        data["connect_url"] == "/-/google-auth/connect?return_to=%2F-%2Fsheet-preview"
+        data["connect_url"]
+        == "/-/google-credentials/connect?return_to=%2F-%2Fsheet-preview"
     )
     # Nothing secret in the listing.
     assert "private_key" not in response.text
@@ -190,6 +191,6 @@ async def test_missing_scopes_redirects_to_connect(mock_google, preview):
     response = await datasette.client.get(here, actor=ALICE)
     assert response.status_code == 302
     location = urlsplit(response.headers["location"])
-    assert location.path == "/-/google-auth/connect"
+    assert location.path == "/-/google-credentials/connect"
     assert parse_qs(location.query) == {"return_to": [here]}
     assert not mock_google.calls("/v4/spreadsheets/", host=SHEETS_HOST)

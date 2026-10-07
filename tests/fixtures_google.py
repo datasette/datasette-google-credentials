@@ -30,8 +30,8 @@ from mock_google.app import MockState, create_app
 from mock_google.keys import ServiceAccountKey, fixture_service_accounts
 from mock_google.oauth import OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET
 
-from datasette_google_auth.config import PLUGIN_NAME
-from datasette_google_auth.http import set_transport
+from datasette_google_credentials.config import PLUGIN_NAME
+from datasette_google_credentials.http import set_transport
 
 GOOGLE_BASE_URLS = {
     "oauth_authorize": f"{MOCK_BASE}/o/oauth2/v2/auth",
@@ -131,7 +131,7 @@ class MockGoogle:
         return self.state.calls(path, **filters)
 
     def plugin_config(self, **overrides: Any) -> dict[str, Any]:
-        """``datasette-google-auth`` plugin config pointing at the mock."""
+        """``datasette-google-credentials`` plugin config pointing at the mock."""
         config: dict[str, Any] = {
             "client_id": OAUTH_CLIENT_ID,
             "client_secret": OAUTH_CLIENT_SECRET,

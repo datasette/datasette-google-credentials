@@ -32,7 +32,7 @@ export type Features = string;
 export type AdminUrl = string | null;
 
 /**
- * The ``/-/google-auth`` management page (ticket 14).
+ * The ``/-/google-credentials`` management page (ticket 14).
  */
 export interface IndexPageData {
   status: StatusResponse;

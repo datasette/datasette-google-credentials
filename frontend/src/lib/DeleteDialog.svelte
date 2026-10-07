@@ -4,7 +4,7 @@
   import Modal from "./Modal.svelte";
 
   type DeleteResult =
-    paths["/-/google-auth/api/credentials/{credential_id}/delete"]["post"]["responses"][200]["content"]["application/json"];
+    paths["/-/google-credentials/api/credentials/{credential_id}/delete"]["post"]["responses"][200]["content"]["application/json"];
 
   /** What the dialog needs of a credential (a `ListedCredential` or an `AdminCredentialInfo`). */
   type DeletableCredential = {
@@ -61,9 +61,12 @@
     busy = true;
     error = null;
     const response = await api(
-      client.POST("/-/google-auth/api/credentials/{credential_id}/delete", {
-        params: { path: { credential_id: credential.id } },
-      }),
+      client.POST(
+        "/-/google-credentials/api/credentials/{credential_id}/delete",
+        {
+          params: { path: { credential_id: credential.id } },
+        },
+      ),
     );
     busy = false;
     if (response.data) {

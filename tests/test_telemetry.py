@@ -21,30 +21,36 @@ from mock_google.oauth import (  # noqa: E402
 )
 from opentelemetry.trace import SpanKind, StatusCode  # noqa: E402
 
-from datasette_google_auth import get_credential  # noqa: E402
-from datasette_google_auth.crypto import (  # noqa: E402
+from datasette_google_credentials import get_credential  # noqa: E402
+from datasette_google_credentials.crypto import (  # noqa: E402
     decrypt_credential,
     encrypt_secret,
 )
-from datasette_google_auth.errors import (  # noqa: E402
+from datasette_google_credentials.errors import (  # noqa: E402
     CredentialBroken,
     CredentialNotFound,
     GoogleTokenError,
 )
-from datasette_google_auth.internal_db import InternalDB  # noqa: E402
-from datasette_google_auth.oauth import FLOW_COOKIE  # noqa: E402
-from datasette_google_auth.permissions import (  # noqa: E402
+from datasette_google_credentials.internal_db import InternalDB  # noqa: E402
+from datasette_google_credentials.oauth import FLOW_COOKIE  # noqa: E402
+from datasette_google_credentials.permissions import (  # noqa: E402
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     CONNECT,
     seed_manager,
 )
-from datasette_google_auth.service import add_service_account, delete  # noqa: E402
-from datasette_google_auth.service_account import mint_token, parse_key  # noqa: E402
-from datasette_google_auth.telemetry import clamp_google_error  # noqa: E402
+from datasette_google_credentials.service import (  # noqa: E402
+    add_service_account,
+    delete,
+)
+from datasette_google_credentials.service_account import (  # noqa: E402
+    mint_token,
+    parse_key,
+)
+from datasette_google_credentials.telemetry import clamp_google_error  # noqa: E402
 
-P = "datasette_google_auth."
-SCOPE = "datasette_google_auth"
+P = "datasette_google_credentials."
+SCOPE = "datasette_google_credentials"
 ALICE = {"id": "alice"}
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
 STUDENTS = f"{SHEETS_BASE}/v4/spreadsheets/students"
@@ -116,7 +122,7 @@ def path_and_query(url: str) -> str:
 
 async def start(datasette, actor=ALICE):
     response = await datasette.client.get(
-        "/-/google-auth/connect?" + urlencode({"return_to": "/"}), actor=actor
+        "/-/google-credentials/connect?" + urlencode({"return_to": "/"}), actor=actor
     )
     assert response.status_code == 302
     return response.headers["location"], response.cookies[FLOW_COOKIE]

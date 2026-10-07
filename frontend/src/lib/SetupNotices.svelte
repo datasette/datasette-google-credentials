@@ -10,16 +10,16 @@
   let { status }: { status: StatusResponse } = $props();
 
   const encryptionSnippet = `plugins:
-  datasette-google-auth:
+  datasette-google-credentials:
     encryption-key:
-      $env: DATASETTE_GOOGLE_AUTH_KEY`;
+      $env: DATASETTE_GOOGLE_CREDENTIALS_KEY`;
 
   const oauthSnippet = `plugins:
-  datasette-google-auth:
+  datasette-google-credentials:
     client_id:
-      $env: DATASETTE_GOOGLE_AUTH_CLIENT_ID
+      $env: DATASETTE_GOOGLE_CREDENTIALS_CLIENT_ID
     client_secret:
-      $env: DATASETTE_GOOGLE_AUTH_CLIENT_SECRET`;
+      $env: DATASETTE_GOOGLE_CREDENTIALS_CLIENT_SECRET`;
 </script>
 
 {#if !status.encryption_configured}
@@ -27,9 +27,9 @@
     {#if status.is_admin}
       <h3>Credentials can't be saved until an encryption key is configured</h3>
       <p>Google credentials are stored encrypted. Generate a key:</p>
-      <pre>datasette google-auth generate-key</pre>
+      <pre>datasette google-credentials generate-key</pre>
       <p>
-        Put it in the <code>DATASETTE_GOOGLE_AUTH_KEY</code> environment
+        Put it in the <code>DATASETTE_GOOGLE_CREDENTIALS_KEY</code> environment
         variable, add this to <code>datasette.yaml</code>, then restart
         Datasette:
       </p>

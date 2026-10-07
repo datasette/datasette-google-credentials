@@ -1,8 +1,8 @@
 """
 Sample plugin: export a table or a query's results to a Google Sheet.
 
-The second proving consumer for the datasette-google-auth broker API (D2, D14).
-It uses only the public API (``from datasette_google_auth import ...``); there
+The second proving consumer for the datasette-google-credentials broker API (D2, D14).
+It uses only the public API (``from datasette_google_credentials import ...``); there
 is no Sheets helper (D12), so it calls the Sheets REST API with
 ``cred.request()``.
 
@@ -53,9 +53,9 @@ from urllib.parse import quote, urlencode, urlsplit
 from datasette import Forbidden, NotFound, Response, hookimpl
 from datasette.resources import DatabaseResource, TableResource
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialBroken,
-    GoogleAuthError,
+    GoogleCredentialsError,
     MissingScopes,
     connect_url,
     error_response,
@@ -501,7 +501,7 @@ async def _render(
 
 
 def _from_auth_error(
-    datasette, form: dict[str, Any], error: GoogleAuthError
+    datasette, form: dict[str, Any], error: GoogleCredentialsError
 ) -> ExportFailed:
     """Show any broker error; offer a reconnect that comes back here when
     reconnecting can fix it."""
@@ -550,7 +550,7 @@ async def _export(datasette, request, form: dict[str, Any]) -> dict[str, Any]:
         cred = await get_credential(
             datasette, form["credential"], actor=actor, scopes=[SPREADSHEETS]
         )
-    except GoogleAuthError as error:
+    except GoogleCredentialsError as error:
         raise _from_auth_error(datasette, form, error) from None
     if form["target"] == "new" and cred.info.type == "service_account":
         # D28: the file would live in the service account's own Drive.
@@ -586,7 +586,7 @@ async def _export(datasette, request, form: dict[str, Any]) -> dict[str, Any]:
                 await clear_tab(cred, spreadsheet_id, tab)
         if values:
             await append_rows(cred, spreadsheet_id, tab, values)
-    except GoogleAuthError as error:
+    except GoogleCredentialsError as error:
         raise _from_auth_error(datasette, form, error) from None
     return {
         "rows": f"{len(rows):,}",

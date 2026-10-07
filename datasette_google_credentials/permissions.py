@@ -1,8 +1,8 @@
-"""The datasette-google-auth permission model: actions, resource, acl roles (D6).
+"""The datasette-google-credentials permission model: actions, resource, acl roles (D6).
 
 * **Global actions** (no resource), handed out through ``datasette.yaml``
-  ``permissions:`` blocks: ``google-auth-connect`` (connect your own Google
-  account), ``google-auth-add-service-account`` and ``google-auth-admin``
+  ``permissions:`` blocks: ``google-credentials-connect`` (connect your own Google
+  account), ``google-credentials-add-service-account`` and ``google-credentials-admin``
   (list, revoke and delete anyone's credentials; it never grants *use* of
   someone else's OAuth credential).
 * **Service accounts** are a one-level acl resource, type
@@ -43,9 +43,9 @@ from .models import SaRole
 #: acl resource type for a service-account credential (1-level: the id).
 RESOURCE_TYPE = "google-service-account"
 
-CONNECT = "google-auth-connect"
-ADD_SERVICE_ACCOUNT = "google-auth-add-service-account"
-ADMIN = "google-auth-admin"
+CONNECT = "google-credentials-connect"
+ADD_SERVICE_ACCOUNT = "google-credentials-add-service-account"
+ADMIN = "google-credentials-admin"
 
 SA_USE = "google-service-account-use"
 SA_EDIT = "google-service-account-edit"

@@ -25,10 +25,13 @@
     busy = true;
     error = null;
     const result = await api(
-      client.POST("/-/google-auth/api/credentials/{credential_id}/rotate-key", {
-        params: { path: { credential_id: credential.id } },
-        body: { key_json: keyJson },
-      }),
+      client.POST(
+        "/-/google-credentials/api/credentials/{credential_id}/rotate-key",
+        {
+          params: { path: { credential_id: credential.id } },
+          body: { key_json: keyJson },
+        },
+      ),
     );
     busy = false;
     if (result.data) {

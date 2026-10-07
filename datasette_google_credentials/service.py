@@ -9,10 +9,10 @@ Every function takes the acting ``actor`` and checks it first:
 ``rename``             owner                           ``google-service-account-edit``
 ``rotate_...key``      n/a                             ``google-service-account-edit``
 ``reconnect_url``      owner                           n/a
-``delete``             owner or ``google-auth-admin``  ``-manage`` or ``google-auth-admin``
+``delete``             owner or ``google-credentials-admin``  ``-manage`` or ``google-credentials-admin``
 =====================  ==============================  =====================================
 
-``google-auth-admin`` may delete anything but never rename or use someone
+``google-credentials-admin`` may delete anything but never rename or use someone
 else's credential (D6): the admin view is list, revoke (= delete) and
 delete (D13).
 
@@ -212,7 +212,7 @@ async def rename(
 ) -> CredentialInfo:
     """Change a credential's label.
 
-    OAuth: the owner only (``google-auth-admin`` gets ``CredentialForbidden``).
+    OAuth: the owner only (``google-credentials-admin`` gets ``CredentialForbidden``).
     Service account: ``google-service-account-edit``. Raises
     ``CredentialNotFound``, ``CredentialForbidden`` or ``InvalidLabel``.
     Fires no event.
@@ -271,8 +271,8 @@ async def delete(
 ) -> DeleteResult:
     """Delete a credential (D16).
 
-    Who: OAuth, the owner or ``google-auth-admin``; service account,
-    ``google-service-account-manage`` or ``google-auth-admin``. Raises
+    Who: OAuth, the owner or ``google-credentials-admin``; service account,
+    ``google-service-account-manage`` or ``google-credentials-admin``. Raises
     ``CredentialNotFound`` or ``CredentialForbidden`` otherwise.
 
     OAuth: the refresh token is revoked at Google first, best effort; the row

@@ -26,20 +26,20 @@ from live_support import (
     SecretText,
 )
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialNotFound,
     InvalidServiceAccountKey,
     get_credential,
 )
-from datasette_google_auth.http import set_transport
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.service import delete
-from datasette_google_auth.service_account import add_service_account
-from datasette_google_auth.token_cache import get_token_cache
+from datasette_google_credentials.http import set_transport
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.service import delete
+from datasette_google_credentials.service_account import add_service_account
+from datasette_google_credentials.token_cache import get_token_cache
 
 pytestmark = [pytest.mark.live, pytest.mark.asyncio]
 
-SCRATCH_TAB = "datasette-google-auth live"
+SCRATCH_TAB = "datasette-google-credentials live"
 GOOGLE_HOSTS = {"oauth2.googleapis.com", "sheets.googleapis.com"}
 
 

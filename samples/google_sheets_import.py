@@ -1,8 +1,8 @@
 """
 Sample plugin: import a Google Sheet into a table, one-shot, started by a user.
 
-Proves the datasette-google-auth broker API with a real consumer (D2, D14).
-It uses only the public API (``from datasette_google_auth import ...``); there
+Proves the datasette-google-credentials broker API with a real consumer (D2, D14).
+It uses only the public API (``from datasette_google_credentials import ...``); there
 is no Sheets helper (D12), so it calls the Sheets REST API with
 ``cred.request()``.
 
@@ -45,9 +45,9 @@ from datasette.utils import tilde_decode, tilde_encode
 from sqlite_utils import Database
 from sqlite_utils.utils import suggest_column_types
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialBroken,
-    GoogleAuthError,
+    GoogleCredentialsError,
     MissingScopes,
     connect_url,
     error_response,
@@ -401,7 +401,9 @@ async def _render(
     return Response.html(html, status=status)
 
 
-def _from_auth_error(datasette, database: str, error: GoogleAuthError) -> ImportFailed:
+def _from_auth_error(
+    datasette, database: str, error: GoogleCredentialsError
+) -> ImportFailed:
     """Show any broker error; offer a reconnect that comes back here when
     reconnecting can fix it."""
     reconnect = None
@@ -449,7 +451,7 @@ async def _import(datasette, request, database: str, form: dict[str, Any]) -> st
         )
         title = await sheet_title(cred, spreadsheet_id, gid, form["sheet"].strip())
         rows = await sheet_values(cred, spreadsheet_id, title)
-    except GoogleAuthError as error:
+    except GoogleCredentialsError as error:
         raise _from_auth_error(datasette, database, error) from None
     if not rows:
         raise ImportFailed(f"Sheet {title!r} is empty")

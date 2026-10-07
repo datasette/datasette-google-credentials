@@ -9,28 +9,28 @@ from datasette_acl.grants import Principal, grant
 from mock_google.keys import SA_TEST, make_service_account
 from mock_google.oauth import SCOPE_EMAIL, SCOPE_OPENID, SCOPE_SHEETS
 
-from datasette_google_auth import (
+from datasette_google_credentials import (
     CredentialForbidden,
     get_credential,
     list_credentials,
 )
-from datasette_google_auth.crypto import encrypt_secret
-from datasette_google_auth.internal_db import InternalDB
-from datasette_google_auth.models import (
+from datasette_google_credentials.crypto import encrypt_secret
+from datasette_google_credentials.internal_db import InternalDB
+from datasette_google_credentials.models import (
     AdminCredentialInfo,
     CredentialInfo,
     DeleteResult,
     ListedCredential,
 )
-from datasette_google_auth.permissions import (
+from datasette_google_credentials.permissions import (
     ADD_SERVICE_ACCOUNT,
     ADMIN,
     CONNECT,
     RESOURCE_TYPE,
 )
-from datasette_google_auth.router import MAX_BODY_BYTES, router
-from datasette_google_auth.routes import api as api_module
-from datasette_google_auth.service import add_service_account
+from datasette_google_credentials.router import MAX_BODY_BYTES, router
+from datasette_google_credentials.routes import api as api_module
+from datasette_google_credentials.service import add_service_account
 
 ALICE = {"id": "alice"}
 BOB = {"id": "bob"}
@@ -38,7 +38,7 @@ CAROL = {"id": "carol"}
 ADMIN_ACTOR = {"id": "admin"}
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
 
-API = "/-/google-auth/api"
+API = "/-/google-credentials/api"
 # Anything that looks like a secret field name must never be in a response.
 SECRET_WORDS = ('private_key"', "refresh_token", "secret", "BEGIN PRIVATE KEY")
 
@@ -134,13 +134,13 @@ def assert_no_secrets(text: str, *extra: str) -> None:
 # --- OpenAPI ------------------------------------------------------------------
 
 API_PATHS = {
-    ("get", "/-/google-auth/api/status"),
-    ("get", "/-/google-auth/api/credentials"),
-    ("get", "/-/google-auth/api/admin/credentials"),
-    ("post", "/-/google-auth/api/service-accounts"),
-    ("post", "/-/google-auth/api/credentials/{credential_id}/rename"),
-    ("post", "/-/google-auth/api/credentials/{credential_id}/rotate-key"),
-    ("post", "/-/google-auth/api/credentials/{credential_id}/delete"),
+    ("get", "/-/google-credentials/api/status"),
+    ("get", "/-/google-credentials/api/credentials"),
+    ("get", "/-/google-credentials/api/admin/credentials"),
+    ("post", "/-/google-credentials/api/service-accounts"),
+    ("post", "/-/google-credentials/api/credentials/{credential_id}/rename"),
+    ("post", "/-/google-credentials/api/credentials/{credential_id}/rotate-key"),
+    ("post", "/-/google-credentials/api/credentials/{credential_id}/delete"),
 }
 
 
@@ -150,7 +150,7 @@ def test_openapi_documents_every_endpoint():
         (method, path)
         for path, methods in doc["paths"].items()
         for method in methods
-        if path.startswith("/-/google-auth/api/")
+        if path.startswith("/-/google-credentials/api/")
     }
     assert operations == API_PATHS
     for method, path in API_PATHS:
@@ -165,7 +165,7 @@ def test_openapi_documents_every_endpoint():
     }
     assert len(bodies) == 3
     # key_json is write-only in the schema, so generated types mark it so.
-    add = bodies["/-/google-auth/api/service-accounts"]["properties"]["key_json"]
+    add = bodies["/-/google-credentials/api/service-accounts"]["properties"]["key_json"]
     assert add["writeOnly"] is True
     # List items are ListedCredential (CredentialInfo plus page fields).
     assert {"AdminCredentialInfo", "ListedCredential"} <= set(
@@ -186,7 +186,7 @@ async def test_status_anonymous_temp_internal_db(mock_google):
         "oauth_configured": True,
         # No --internal: Datasette uses a throwaway temp file.
         "internal_db_persistent": False,
-        "redirect_uri": "http://localhost/-/google-auth/oauth/callback",
+        "redirect_uri": "http://localhost/-/google-credentials/oauth/callback",
         "can_connect": False,
         "can_add_service_account": False,
         "is_admin": False,
@@ -853,7 +853,7 @@ async def test_admin_can_list_and_delete_but_never_use(mock_google):
     assert len(mock_google.calls("/revoke", method="POST")) == 1
 
 
-# --- No GoogleAuthError escapes to Datasette ----------------------------------
+# --- No GoogleCredentialsError escapes to Datasette ----------------------------------
 
 
 def assert_json_error(response, status, code):
@@ -916,17 +916,19 @@ def _raiser(exc):
         ("delete", "post", "/credentials/x/delete", None),
     ],
 )
-async def test_every_handler_returns_json_for_google_auth_errors(
+async def test_every_handler_returns_json_for_google_credentials_errors(
     mock_google, monkeypatch, target, method, path, body
 ):
-    from datasette_google_auth.errors import GoogleAuthError
+    from datasette_google_credentials.errors import GoogleCredentialsError
 
     datasette = await make_datasette(mock_google)
-    # A base GoogleAuthError (500 in error_response) whose message names an
+    # A base GoogleCredentialsError (500 in error_response) whose message names an
     # SA email: it must come back as JSON, not escape to Datasette.
-    monkeypatch.setattr(api_module, target, _raiser(GoogleAuthError(f"bad {LEAKY}")))
+    monkeypatch.setattr(
+        api_module, target, _raiser(GoogleCredentialsError(f"bad {LEAKY}"))
+    )
     if method == "get":
         response = await get(datasette, path, actor=ALICE)
     else:
         response = await post(datasette, path, body, actor=ALICE)
-    assert_json_error(response, 500, "google_auth_error")
+    assert_json_error(response, 500, "google_credentials_error")

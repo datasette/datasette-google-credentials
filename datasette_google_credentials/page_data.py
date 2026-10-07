@@ -19,7 +19,7 @@ class ShareDialog(BaseModel):
 
 
 class IndexPageData(BaseModel):
-    """The ``/-/google-auth`` management page (ticket 14)."""
+    """The ``/-/google-credentials`` management page (ticket 14)."""
 
     status: StatusResponse
     credentials: list[ListedCredential]
@@ -32,12 +32,12 @@ class IndexPageData(BaseModel):
     share: ShareDialog | None
     """None when datasette-acl-share's bundle isn't built: no Share buttons."""
     admin_url: str | None
-    """The "All credentials" admin page, for ``google-auth-admin`` holders
+    """The "All credentials" admin page, for ``google-credentials-admin`` holders
     only (None otherwise)."""
 
 
 class AdminPageData(BaseModel):
-    """The ``/-/google-auth/admin`` "All credentials" page (ticket 15).
+    """The ``/-/google-credentials/admin`` "All credentials" page (ticket 15).
     Information only: nothing here lets the admin use a credential (D6)."""
 
     status: StatusResponse
@@ -48,7 +48,7 @@ class AdminPageData(BaseModel):
     """Display names for actor ids (``actors_from_ids``); absent ids show as
     themselves."""
     manage_url: str
-    """The ``/-/google-auth`` management page, where admins manage their own
+    """The ``/-/google-credentials`` management page, where admins manage their own
     credentials."""
 
 

@@ -4,13 +4,13 @@ Registered with the ``register_events`` hook and fired with
 ``datasette.track_event()``, so any plugin implementing ``track_event``
 (audit logs, alerts, telemetry) sees them:
 
-* ``google-auth-credential-created``: a service account was added, or a
+* ``google-credential-created``: a service account was added, or a
   Google account connected for the first time
-* ``google-auth-credential-reconnected``: an existing OAuth credential was
+* ``google-credential-reconnected``: an existing OAuth credential was
   connected again (new refresh token, same row)
-* ``google-auth-credential-rotated``: a service account got a new key
-* ``google-auth-credential-deleted``: with ``revoked`` for OAuth
-* ``google-auth-credential-broken``: Google rejected the stored secret
+* ``google-credential-rotated``: a service account got a new key
+* ``google-credential-deleted``: with ``revoked`` for OAuth
+* ``google-credential-broken``: Google rejected the stored secret
   (``invalid_grant``), with the ``detail`` users see
 
 There are no per-use events (D10): ``last_used_*`` covers that.
@@ -58,45 +58,45 @@ class CredentialEvent(Event):
 
 @dataclass
 class CredentialCreatedEvent(CredentialEvent):
-    """Event name: ``google-auth-credential-created``"""
+    """Event name: ``google-credential-created``"""
 
-    name = "google-auth-credential-created"
+    name = "google-credential-created"
 
 
 @dataclass
 class CredentialReconnectedEvent(CredentialEvent):
-    """Event name: ``google-auth-credential-reconnected``"""
+    """Event name: ``google-credential-reconnected``"""
 
-    name = "google-auth-credential-reconnected"
+    name = "google-credential-reconnected"
 
 
 @dataclass
 class CredentialRotatedEvent(CredentialEvent):
-    """Event name: ``google-auth-credential-rotated``"""
+    """Event name: ``google-credential-rotated``"""
 
-    name = "google-auth-credential-rotated"
+    name = "google-credential-rotated"
 
 
 @dataclass
 class CredentialDeletedEvent(CredentialEvent):
-    """Event name: ``google-auth-credential-deleted``
+    """Event name: ``google-credential-deleted``
 
     :ivar revoked: OAuth: whether Google confirmed the revocation. ``None``
         for service accounts, which have nothing to revoke from here.
     """
 
-    name = "google-auth-credential-deleted"
+    name = "google-credential-deleted"
     revoked: bool | None
 
 
 @dataclass
 class CredentialBrokenEvent(CredentialEvent):
-    """Event name: ``google-auth-credential-broken``
+    """Event name: ``google-credential-broken``
 
     :ivar detail: The status detail shown to users (no secrets).
     """
 
-    name = "google-auth-credential-broken"
+    name = "google-credential-broken"
     detail: str
 
 

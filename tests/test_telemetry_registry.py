@@ -1,5 +1,5 @@
 """
-Two-way conformance between `datasette_google_auth/telemetry_registry.py`
+Two-way conformance between `datasette_google_credentials/telemetry_registry.py`
 and what the plugin actually emits, plus the privacy walk (D29).
 
 `just telemetry-doc-check` guarantees the README matches the registry; this
@@ -45,36 +45,36 @@ from mock_google.oauth import (  # noqa: E402
 )
 from mock_google.tokens import MSG_UNKNOWN_ACCOUNT  # noqa: E402
 
-from datasette_google_auth import get_credential  # noqa: E402
-from datasette_google_auth import telemetry_registry as reg  # noqa: E402
-from datasette_google_auth.crypto import (  # noqa: E402
+from datasette_google_credentials import get_credential  # noqa: E402
+from datasette_google_credentials import telemetry_registry as reg  # noqa: E402
+from datasette_google_credentials.crypto import (  # noqa: E402
     decrypt_credential,
     encrypt_secret,
 )
-from datasette_google_auth.errors import (  # noqa: E402
+from datasette_google_credentials.errors import (  # noqa: E402
     CredentialBroken,
     CredentialNotFound,
     DisallowedHost,
     GoogleTokenError,
     InvalidServiceAccountKey,
 )
-from datasette_google_auth.http import set_transport  # noqa: E402
-from datasette_google_auth.internal_db import InternalDB  # noqa: E402
-from datasette_google_auth.oauth import FLOW_COOKIE  # noqa: E402
-from datasette_google_auth.permissions import (  # noqa: E402
+from datasette_google_credentials.http import set_transport  # noqa: E402
+from datasette_google_credentials.internal_db import InternalDB  # noqa: E402
+from datasette_google_credentials.oauth import FLOW_COOKIE  # noqa: E402
+from datasette_google_credentials.permissions import (  # noqa: E402
     ADD_SERVICE_ACCOUNT,
     CONNECT,
     seed_manager,
 )
-from datasette_google_auth.service import (  # noqa: E402
+from datasette_google_credentials.service import (  # noqa: E402
     add_service_account,
     delete,
     rotate_service_account_key,
 )
-from datasette_google_auth.service_account import parse_key  # noqa: E402
-from datasette_google_auth.token_cache import get_token_cache  # noqa: E402
+from datasette_google_credentials.service_account import parse_key  # noqa: E402
+from datasette_google_credentials.token_cache import get_token_cache  # noqa: E402
 
-SCOPE = "datasette_google_auth"
+SCOPE = "datasette_google_credentials"
 
 ACTOR_ID = "actor-sentinel-XYZZY"
 ACTOR = {"id": ACTOR_ID}
@@ -84,7 +84,7 @@ SHEET_ID = "sheet-sentinel-XYZZY"
 QUERY_VALUE = "query-sentinel-XYZZY"
 ALL_SCOPES = [SCOPE_OPENID, SCOPE_EMAIL, SCOPE_SHEETS]
 STUDENTS = f"{SHEETS_BASE}/v4/spreadsheets/students"
-API = "/-/google-auth/api"
+API = "/-/google-credentials/api"
 
 # Form fields that carry a secret or identifier (grant_type, redirect_uri
 # and scope are public constants).
@@ -101,91 +101,91 @@ SECRET_FORM_FIELDS = {
 
 def test_package_never_imports_the_sdk():
     # Front-loaded by conftest's pytest_collection_modifyitems.
-    assert_package_never_imports_sdk("datasette_google_auth")
+    assert_package_never_imports_sdk("datasette_google_credentials")
 
 
 # The names as they appear on the wire, written out rather than read from the
 # registry. If a registry change fails this, it renames something dashboards
 # depend on: a decision to take deliberately, here.
 EXPECTED_ATTRIBUTES = {
-    "datasette_google_auth.token": {
-        "datasette_google_auth.credential.id",
-        "datasette_google_auth.credential.type",
-        "datasette_google_auth.cache",
+    "datasette_google_credentials.token": {
+        "datasette_google_credentials.credential.id",
+        "datasette_google_credentials.credential.type",
+        "datasette_google_credentials.cache",
         "error.type",
     },
-    "datasette_google_auth.request": {
-        "datasette_google_auth.credential.id",
-        "datasette_google_auth.credential.type",
+    "datasette_google_credentials.request": {
+        "datasette_google_credentials.credential.id",
+        "datasette_google_credentials.credential.type",
         "http.request.method",
         "server.address",
         "http.response.status_code",
-        "datasette_google_auth.retried",
+        "datasette_google_credentials.retried",
         "error.type",
     },
-    "datasette_google_auth.token.mint": {
-        "datasette_google_auth.scopes.count",
-        "datasette_google_auth.outcome",
+    "datasette_google_credentials.token.mint": {
+        "datasette_google_credentials.scopes.count",
+        "datasette_google_credentials.outcome",
         "http.response.status_code",
-        "datasette_google_auth.google.error",
+        "datasette_google_credentials.google.error",
         "error.type",
     },
-    "datasette_google_auth.token.refresh": {
-        "datasette_google_auth.outcome",
+    "datasette_google_credentials.token.refresh": {
+        "datasette_google_credentials.outcome",
         "http.response.status_code",
-        "datasette_google_auth.google.error",
-        "datasette_google_auth.refresh_token.rotated",
+        "datasette_google_credentials.google.error",
+        "datasette_google_credentials.refresh_token.rotated",
         "error.type",
     },
-    "datasette_google_auth.oauth.exchange": {
-        "datasette_google_auth.outcome",
+    "datasette_google_credentials.oauth.exchange": {
+        "datasette_google_credentials.outcome",
         "http.response.status_code",
-        "datasette_google_auth.google.error",
+        "datasette_google_credentials.google.error",
         "error.type",
     },
-    "datasette_google_auth.oauth.userinfo": {
-        "datasette_google_auth.outcome",
+    "datasette_google_credentials.oauth.userinfo": {
+        "datasette_google_credentials.outcome",
         "http.response.status_code",
-        "datasette_google_auth.google.error",
+        "datasette_google_credentials.google.error",
         "error.type",
     },
-    "datasette_google_auth.oauth.revoke": {
-        "datasette_google_auth.outcome",
+    "datasette_google_credentials.oauth.revoke": {
+        "datasette_google_credentials.outcome",
         "http.response.status_code",
-        "datasette_google_auth.google.error",
+        "datasette_google_credentials.google.error",
         "error.type",
     },
-    "datasette_google_auth.oauth.callback": {
-        "datasette_google_auth.callback.result",
-        "datasette_google_auth.credential.id",
-        "datasette_google_auth.google.error",
-        "datasette_google_auth.scopes.missing",
+    "datasette_google_credentials.oauth.callback": {
+        "datasette_google_credentials.callback.result",
+        "datasette_google_credentials.credential.id",
+        "datasette_google_credentials.google.error",
+        "datasette_google_credentials.scopes.missing",
         "error.type",
     },
 }
 
 EXPECTED_METRIC_ATTRIBUTES = {
-    "datasette_google_auth.google.duration": {
-        "datasette_google_auth.google.operation",
-        "datasette_google_auth.outcome",
-        "datasette_google_auth.google.error",
+    "datasette_google_credentials.google.duration": {
+        "datasette_google_credentials.google.operation",
+        "datasette_google_credentials.outcome",
+        "datasette_google_credentials.google.error",
     },
-    "datasette_google_auth.token_cache.lookups": {
-        "datasette_google_auth.credential.type",
-        "datasette_google_auth.cache",
+    "datasette_google_credentials.token_cache.lookups": {
+        "datasette_google_credentials.credential.type",
+        "datasette_google_credentials.cache",
     },
-    "datasette_google_auth.request.duration": {
-        "datasette_google_auth.credential.type",
+    "datasette_google_credentials.request.duration": {
+        "datasette_google_credentials.credential.type",
         "http.request.method",
         "http.response.status_code",
-        "datasette_google_auth.retried",
+        "datasette_google_credentials.retried",
         "error.type",
     },
-    "datasette_google_auth.credentials.broken": {
-        "datasette_google_auth.credential.type",
+    "datasette_google_credentials.credentials.broken": {
+        "datasette_google_credentials.credential.type",
     },
-    "datasette_google_auth.oauth.callbacks": {
-        "datasette_google_auth.callback.result",
+    "datasette_google_credentials.oauth.callbacks": {
+        "datasette_google_credentials.callback.result",
     },
 }
 
@@ -207,7 +207,7 @@ def test_no_metric_dimension_is_an_identifier():
     # D29: credential ids on spans only. Every metric attribute is a closed
     # enum, a bool, a clamped method, a status code or a class name.
     for metric in reg.METRICS:
-        assert "datasette_google_auth.credential.id" not in metric.attributes
+        assert "datasette_google_credentials.credential.id" not in metric.attributes
 
 
 def test_histograms_declare_buckets():
@@ -264,7 +264,8 @@ class Flow:
 
     async def authorize(self):
         response = await self.datasette.client.get(
-            "/-/google-auth/connect?" + urlencode({"return_to": "/"}), actor=ACTOR
+            "/-/google-credentials/connect?" + urlencode({"return_to": "/"}),
+            actor=ACTOR,
         )
         assert response.status_code == 302
         cookie = response.cookies[FLOW_COOKIE]
@@ -351,14 +352,14 @@ async def run_workload(datasette, mock_google, service_account_keys):
         )
 
     # The JSON API and pages, each inside core's request span: no
-    # GoogleAuthError may escape a route and put its message there (D29).
+    # GoogleCredentialsError may escape a route and put its message there (D29).
     for path in (
         f"{API}/status",
         f"{API}/credentials",
         f"{API}/credentials?scopes={SCOPE_SHEETS}",
         f"{API}/admin/credentials",  # 403: not an admin
-        "/-/google-auth",
-        "/-/google-auth/admin",
+        "/-/google-credentials",
+        "/-/google-credentials/admin",
     ):
         await datasette.client.get(path, actor=ACTOR)
     added = await datasette.client.post(

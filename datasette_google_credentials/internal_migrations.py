@@ -1,8 +1,11 @@
-"""Internal-database schema for datasette-google-auth (via sqlite-migrate).
+"""Internal-database schema for datasette-google-credentials (via sqlite-migrate).
 
 Append-only: never edit an applied migration, add a new ``m00N_...`` one.
+(One-time exception: the pre-release rename from datasette-google-auth edited
+m001's table/index names and the migration set name in place, since no
+deployed database existed. Delete any old dev internal DB.)
 
-One table, ``datasette_google_auth_credentials`` (D10): service-account keys
+One table, ``datasette_google_credentials`` (D10): service-account keys
 and per-user OAuth connections, secrets Fernet-encrypted in
 ``secret_encrypted``.
 
@@ -14,13 +17,13 @@ validated in Python instead (``internal_db.CredentialType``).
 from sqlite_migrate import Migrations
 from sqlite_utils import Database
 
-internal_migrations = Migrations("datasette-google-auth.internal")
+internal_migrations = Migrations("datasette-google-credentials.internal")
 
 
 @internal_migrations()
 def m001_credentials(db: Database):
     db.executescript("""
-        CREATE TABLE IF NOT EXISTS datasette_google_auth_credentials (
+        CREATE TABLE IF NOT EXISTS datasette_google_credentials (
             id               TEXT PRIMARY KEY,  -- ULID
             type             TEXT NOT NULL,     -- validated in Python
             label            TEXT NOT NULL,
@@ -41,9 +44,9 @@ def m001_credentials(db: Database):
         );
         -- One OAuth credential per (owner, Google account); reconnecting the
         -- same account updates in place (D9).
-        CREATE UNIQUE INDEX IF NOT EXISTS datasette_google_auth_credentials_oauth_unique
-            ON datasette_google_auth_credentials(owner_id, google_subject)
+        CREATE UNIQUE INDEX IF NOT EXISTS datasette_google_credentials_oauth_unique
+            ON datasette_google_credentials(owner_id, google_subject)
             WHERE type = 'google_oauth';
-        CREATE INDEX IF NOT EXISTS datasette_google_auth_credentials_owner
-            ON datasette_google_auth_credentials(owner_id);
+        CREATE INDEX IF NOT EXISTS datasette_google_credentials_owner
+            ON datasette_google_credentials(owner_id);
     """)
